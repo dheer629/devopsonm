@@ -48,3 +48,20 @@ python3 tests/access_and_tui.py --context vcluster-docker_dev --namespace devops
 The E2E runner compares live pod names with the Kubernetes API, exercises report modes, JSON and error exits, and verifies evidence checksums, permissions and redaction. Fault testing temporarily creates a failed Pod, pending PVC, short-lived TLS certificate and canary Secret in `devopsonm`, then removes them. It refuses to overwrite existing fixtures. Access tests use Kubernetes impersonation (requires impersonation permission) to verify real RBAC denials and open pseudo-terminals to check dashboard startup and terminal restoration. Private outputs are written under `~/.devopssentinel/e2e-results/`; they are not committed. GitHub Actions runs offline and non-root container checks without cluster credentials.
 
 See [the recorded validation results and coverage limits](docs/VALIDATION.md).
+
+## Browser edition — DevOpsSentinel Web
+
+`devopssentinel-web/` contains a local, read-only browser control center that drives this same
+engine through a typed FastAPI adapter (no ANSI scraping, no duplicated Kubernetes logic, no
+cluster mutation).
+
+```bash
+cd devopssentinel-web
+./devopssentinel-web --open        # http://127.0.0.1:8765
+```
+
+It exposes the engine's report modes as typed operations, adds a problem-first dashboard, findings
+queue, pod/log/event investigation, dependency topology, GitOps and PKI dashboards, network and
+storage centers, incident evidence browsing and local exports. The complete per-feature accounting
+lives in [`devopssentinel-web/docs/FEATURE_PARITY_MATRIX.md`](devopssentinel-web/docs/FEATURE_PARITY_MATRIX.md).
+

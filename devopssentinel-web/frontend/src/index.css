@@ -1,0 +1,125 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------ *
+ * DevOpsSentinel design system -- semantic tokens (spec sections 11-13)
+ * Dark is primary. Status is never communicated by colour alone.
+ * ------------------------------------------------------------------ */
+
+:root {
+  --bg: #f6f7f9;
+  --bg-elevated: #ffffff;
+  --panel: #ffffff;
+  --panel-2: #f1f3f6;
+  --border: #d8dce3;
+  --border-strong: #b9c0cb;
+  --text: #10151c;
+  --text-muted: #4b5563;
+  --text-faint: #5b6472;
+  --accent: #0b6bcb;
+
+  --c-kubernetes: #0e7490;
+  --c-gitops: #7c3aed;
+  --c-pki: #b45309;
+  --c-network: #1d4ed8;
+  --c-storage: #0f766e;
+  --c-success: #15803d;
+  --c-warning: #b45309;
+  --c-critical: #b91c1c;
+  --c-unknown: #6b7280;
+  --c-info: #0369a1;
+}
+
+.dark {
+  --bg: #0b0e13;
+  --bg-elevated: #11151c;
+  --panel: #12171f;
+  --panel-2: #171d26;
+  --border: #232b36;
+  --border-strong: #33404f;
+  --text: #e6ebf2;
+  --text-muted: #a8b4c4;
+  --text-faint: #8b98a9;
+  --accent: #4c9aff;
+
+  --c-kubernetes: #22d3ee;
+  --c-gitops: #a78bfa;
+  --c-pki: #fbbf24;
+  --c-network: #60a5fa;
+  --c-storage: #2dd4bf;
+  --c-success: #4ade80;
+  --c-warning: #fbbf24;
+  --c-critical: #f87171;
+  --c-unknown: #94a3b8;
+  --c-info: #38bdf8;
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-bg-elevated: var(--bg-elevated);
+  --color-panel: var(--panel);
+  --color-panel-2: var(--panel-2);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-text-faint: var(--text-faint);
+  --color-accent: var(--accent);
+  --color-kubernetes: var(--c-kubernetes);
+  --color-gitops: var(--c-gitops);
+  --color-pki: var(--c-pki);
+  --color-network: var(--c-network);
+  --color-storage: var(--c-storage);
+  --color-success: var(--c-success);
+  --color-warning: var(--c-warning);
+  --color-critical: var(--c-critical);
+  --color-unknown: var(--c-unknown);
+  --color-info: var(--c-info);
+  --font-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", "Cascadia Code", Consolas, monospace;
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-sans);
+  font-size: 13px;
+  -webkit-font-smoothing: antialiased;
+}
+
+*:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.mono {
+  font-family: var(--font-mono);
+  font-variant-numeric: tabular-nums;
+}
+
+.scroll-thin::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+.scroll-thin::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 6px;
+}
+.scroll-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}

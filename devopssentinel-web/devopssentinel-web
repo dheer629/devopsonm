@@ -1,0 +1,177 @@
+#!/usr/bin/env bash
+# DevOpsSentinel Web -- one-command local launcher.
+#
+#   ./devopssentinel-web [--open|--no-open] [--debug] [--incident ID]
+#                        [--port N] [--host H] [--context C] [--namespace NS]
+#
+# Binds to 127.0.0.1 by default. Never exposes the LAN unless --listen is
+# given explicitly, and --listen additionally requires --token.
+set -uo pipefail
+
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+cd "$SCRIPT_DIR" || exit 1
+
+WEB_VERSION="1.0.0"
+HOST="127.0.0.1"
+PORT="8765"
+OPEN_MODE="auto"
+DEBUG=0
+INCIDENT=""
+CONTEXT=""
+NAMESPACE=""
+TOKEN=""
+PYTHON_BIN="${PYTHON:-}"
+
+usage() {
+    cat <<'HELP'
+DevOpsSentinel Web -- local read-only Kubernetes / GitOps / PKI / ETDP console
+
+  ./devopssentinel-web [options]
+
+Options:
+  --open            Open the browser after startup
+  --no-open         Never open the browser
+  --debug           Enable the developer diagnostics panel
+  --incident ID     Start in incident mode for INCIDENT ID
+  --context NAME    Default kubeconfig context
+  --namespace NAME  Default namespace
+  --port N          Port to bind (default 8765)
+  --host H          Bind address (default 127.0.0.1)
+  --listen H        Explicit non-local bind; requires --token
+  --token TOKEN     Access token required when binding beyond 127.0.0.1
+  -h, --help        Show this help
+
+The engine (DevOps_K8s_Sentinel_FINAL_GP.sh) is the operational source of
+truth. This launcher never mutates the cluster and never requires sudo.
+HELP
+}
+
+while (($#)); do
+    case "$1" in
+        --open) OPEN_MODE="open" ;;
+        --no-open) OPEN_MODE="never" ;;
+        --debug) DEBUG=1 ;;
+        --incident) INCIDENT="${2:-}"; shift ;;
+        --context) CONTEXT="${2:-}"; shift ;;
+        --namespace) NAMESPACE="${2:-}"; shift ;;
+        --port) PORT="${2:-8765}"; shift ;;
+        --host) HOST="${2:-127.0.0.1}"; shift ;;
+        --listen) HOST="${2:-0.0.0.0}"; shift ;;
+        --token) TOKEN="${2:-}"; shift ;;
+        -h|--help) usage; exit 0 ;;
+        *) printf 'Unknown option: %s\n' "$1" >&2; usage; exit 2 ;;
+    esac
+    shift
+done
+
+if [[ "$HOST" != "127.0.0.1" && "$HOST" != "localhost" && -z "$TOKEN" ]]; then
+    printf 'Refusing non-local bind without --token.\n' >&2
+    printf 'Use --listen 0.0.0.0 --token <secret> to confirm explicitly.\n' >&2
+    exit 2
+fi
+
+# ------------------------------------------------------------------ python
+if [[ -z "$PYTHON_BIN" ]]; then
+    if command -v python3 >/dev/null 2>&1; then PYTHON_BIN=python3
+    elif command -v python >/dev/null 2>&1; then PYTHON_BIN=python
+    else printf 'Python 3.11+ is required but was not found.\n' >&2; exit 3; fi
+fi
+
+if ! "$PYTHON_BIN" -c 'import sys; raise SystemExit(0 if sys.version_info >= (3, 11) else 1)' >/dev/null 2>&1; then
+    printf 'Python 3.11+ is required.\n' >&2
+    exit 3
+fi
+
+# ------------------------------------------------------------------ engine
+ENGINE="$SCRIPT_DIR/../DevOps_K8s_Sentinel_FINAL_GP.sh"
+[[ -f "$ENGINE" ]] || ENGINE="$SCRIPT_DIR/DevOps_K8s_Sentinel_FINAL_GP.sh"
+ENGINE_STATE="MISSING"
+[[ -f "$ENGINE" ]] && ENGINE_STATE="READY"
+
+# ------------------------------------------------------------------ deps
+if ! "$PYTHON_BIN" -c "import fastapi, uvicorn, pydantic" >/dev/null 2>&1; then
+    printf 'Installing backend dependencies (first run)…\n'
+    "$PYTHON_BIN" -m pip install --disable-pip-version-check -q -r "$SCRIPT_DIR/backend/requirements.txt" || {
+        printf 'Dependency installation failed.\n' >&2; exit 3; }
+fi
+
+# ------------------------------------------------------------------ frontend
+FRONTEND_STATE="READY"
+[[ -f "$SCRIPT_DIR/frontend/dist/index.html" ]] || FRONTEND_STATE="NOT BUILT"
+
+# ------------------------------------------------------------------ scope
+if command -v kubectl >/dev/null 2>&1; then
+    KUBERNETES_STATE="CONNECTED"
+    [[ -n "$CONTEXT" ]] || CONTEXT=$(kubectl config current-context 2>/dev/null || true)
+else
+    KUBERNETES_STATE="UNAVAILABLE"
+fi
+
+printf 'DevOpsSentinel Web v%s\n\n' "$WEB_VERSION"
+printf '%-12s %-14s %s\n' 'Sentinel' 'v4.2.2' "$ENGINE_STATE"
+printf '%-12s %-14s %s\n' 'Backend' '' 'READY'
+printf '%-12s %-14s %s\n' 'Frontend' '' "$FRONTEND_STATE"
+printf '%-12s %-14s %s\n' 'Kubernetes' '' "$KUBERNETES_STATE"
+printf '%-12s %-14s %s\n' 'Context' '' "${CONTEXT:-none}"
+printf '%-12s %-14s %s\n' 'Namespace' '' "${NAMESPACE:-all}"
+printf '%-12s %-14s %s\n' 'Mode' '' 'SUPERVISION [READ ONLY]'
+printf '\nOpen:\nhttp://%s:%s\n\n' "$HOST" "$PORT"
+
+export DSWEB_HOST="$HOST"
+export DSWEB_PORT="$PORT"
+export DSWEB_DEBUG="$DEBUG"
+export PYTHONPATH="$SCRIPT_DIR/backend${PYTHONPATH:+:$PYTHONPATH}"
+[[ -n "$INCIDENT" ]] && export DSWEB_INCIDENT_ID="$INCIDENT"
+[[ -n "$TOKEN" ]] && export DSWEB_ACCESS_TOKEN="$TOKEN"
+
+# ------------------------------------------------------------------ browser
+open_browser() {
+    local url="http://127.0.0.1:$PORT"
+    if command -v wslview >/dev/null 2>&1; then
+        wslview "$url" >/dev/null 2>&1 && return 0
+    fi
+    if command -v powershell.exe >/dev/null 2>&1; then
+        powershell.exe -NoProfile Start-Process "$url" >/dev/null 2>&1 && return 0
+    fi
+    if command -v cmd.exe >/dev/null 2>&1; then
+        cmd.exe /c start "" "$url" >/dev/null 2>&1 && return 0
+    fi
+    if command -v xdg-open >/dev/null 2>&1; then
+        xdg-open "$url" >/dev/null 2>&1 && return 0
+    fi
+    printf 'Could not open a browser automatically; open %s manually.\n' "$url" >&2
+    return 1
+}
+
+# ------------------------------------------------------------------ server
+cleanup() {
+    printf '\nShutting down DevOpsSentinel Web…\n'
+    if [[ -n "${SERVER_PID:-}" ]] && kill -0 "$SERVER_PID" 2>/dev/null; then
+        kill -TERM "$SERVER_PID" 2>/dev/null || true
+        wait "$SERVER_PID" 2>/dev/null || true
+    fi
+    printf 'Stopped. No orphan processes.\n'
+}
+trap cleanup INT TERM EXIT
+
+"$PYTHON_BIN" -m uvicorn app.main:app --host "$HOST" --port "$PORT" \
+    --log-level "${DSWEB_LOG_LEVEL:-info}" &
+SERVER_PID=$!
+
+for _ in $(seq 1 60); do
+    kill -0 "$SERVER_PID" 2>/dev/null || { printf 'Backend exited during startup.\n' >&2; exit 4; }
+    if command -v curl >/dev/null 2>&1; then
+        curl -fsS "http://127.0.0.1:$PORT/api/v1/version" >/dev/null 2>&1 && break
+    else
+        sleep 1
+        break
+    fi
+    sleep 0.25
+done
+
+if [[ "$OPEN_MODE" == "open" ]]; then
+    open_browser || true
+fi
+
+wait "$SERVER_PID"
+

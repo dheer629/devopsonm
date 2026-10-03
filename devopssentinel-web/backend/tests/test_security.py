@@ -1,0 +1,88 @@
+"""Security tests: redaction, validation, read-only guard, origin checks."""
+
+from __future__ import annotations
+
+import pytest
+
+from app.security import (
+    assert_read_only,
+    origin_allowed,
+    redact_text,
+    validate_context,
+    validate_kind,
+    validate_name,
+    validate_tail,
+)
+
+
+def test_redact_bearer_token():
+    text = "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.payload.sig"
+    assert "eyJhbGciOiJIUzI1NiJ9" not in redact_text(text)
+    assert "[REDACTED]" in redact_text(text)
+
+
+def test_redact_url_credentials():
+    text = "postgres://admin:s3cr3t@db.internal:5432/app"
+    out = redact_text(text)
+    assert "s3cr3t" not in out
+    assert "db.internal" in out
+
+
+def test_redact_private_key_block():
+    text = (
+        "-----BEGIN RSA PRIVATE KEY-----\n"
+        "MIIEowIBAAKCAQEA\n"
+        "-----END RSA PRIVATE KEY-----\n"
+        "done"
+    )
+    out = redact_text(text)
+    assert "MIIEowIBAAKCAQEA" not in out
+    assert "[REDACTED PRIVATE KEY]" in out
+
+
+def test_redact_key_value_password():
+    assert "hunter2" not in redact_text("password=hunter2")
+
+
+def test_read_only_guard_blocks_mutation_verbs():
+    with pytest.raises(PermissionError):
+        assert_read_only(["get", "pods", "delete", "pod/x"])
+    with pytest.raises(PermissionError):
+        assert_read_only(["apply", "-f", "x.yaml"])
+    # read-only commands pass
+    assert_read_only(["get", "pods", "-n", "default"])
+
+
+def test_validate_name_rejects_injection():
+    assert validate_name("transformer-abc") == "transformer-abc"
+    for bad in ("../etc/passwd", "a;rm -rf /", "$(whoami)", "UPPER", "with space", ""):
+        with pytest.raises(ValueError):
+            validate_name(bad)
+
+
+def test_validate_context_allows_real_contexts():
+    assert validate_context("vcluster-docker_dev") == "vcluster-docker_dev"
+    assert validate_context("pny9-11-ccd3-oidc") == "pny9-11-ccd3-oidc"
+    with pytest.raises(ValueError):
+        validate_context("bad context; rm -rf /")
+
+
+def test_validate_kind():
+    assert validate_kind("Deployment") == "Deployment"
+    with pytest.raises(ValueError):
+        validate_kind("Deployment; rm")
+
+
+def test_validate_tail_bounds():
+    assert validate_tail(500) == 500
+    with pytest.raises(ValueError):
+        validate_tail(0)
+    with pytest.raises(ValueError):
+        validate_tail(10_000_000)
+
+
+def test_origin_allowed():
+    allowed = ["http://127.0.0.1:8765"]
+    assert origin_allowed(None, allowed)
+    assert origin_allowed("http://127.0.0.1:8765", allowed)
+    assert not origin_allowed("http://evil.example", allowed)
