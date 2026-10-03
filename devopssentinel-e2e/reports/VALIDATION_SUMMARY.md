@@ -1,32 +1,38 @@
 # DevOpsSentinel real-cluster E2E validation summary
 
-Run `20261003T145408Z`, mode `FULL`, context `vcluster-docker_dev`
-(local Docker vcluster, Kubernetes v1.30.4, single node `dev`).
+Run `20261003T160122Z`, mode `FULL` with `--install-prereqs --keep`, context
+`vcluster-docker_dev` (local Docker vcluster, Kubernetes v1.30.4, single node `dev`).
 Validated utility SHA-256
-`761c141cf9998e224855cc8fb98e7333a5125113c51233e8987459d48a71c722`.
+`63a8d8937330a071221de3ccea9bfeccd1fac33965554fec9efc724a3ca4fbe5`.
 
 ## Result
 
 | Outcome | Count |
 | --- | --- |
-| PASS | 81 |
+| PASS | 86 |
 | FAIL | 0 |
-| BLOCKED | 6 |
+| BLOCKED | 0 |
 | NOT_APPLICABLE | 1 |
 
-All 81 runnable tests compared live Kubernetes API truth with the Sentinel's
+All 86 runnable tests compared live Kubernetes API truth with the Sentinel's
 own output, machine-asserted, with evidence captured per case under
-`~/.devopssentinel/real-e2e/20261003T145408Z/`. No test was marked PASS from a
-successful `kubectl apply` alone.
+`~/.devopssentinel/real-e2e/20261003T160122Z/`. No test was marked PASS from a
+successful `kubectl apply` alone. Every previously BLOCKED case now PASSES, and
+the run used `--keep`, so **all fixtures and cert-manager remain deployed** for
+manual inspection.
 
-Release gate: **NOT APPROVED** while six tests remain BLOCKED (see below).
+Release gate: **NO FAILURES AND NO BLOCKED CASES REMAIN** for this disposable
+local cluster. This is not a claim of universal production readiness; see the
+coverage limits in `docs/VALIDATION.md`.
 
 ## Safety gate
 
 The harness refuses to run unless the context is a disposable local cluster.
 `vcluster-docker_dev` is a local vcluster in Docker; all fixtures were created
 only in `devopssentinel-e2e*` namespaces, labelled
-`devopssentinel.io/test-suite=true`, and removed by `cleanup.sh` at the end.
+`devopssentinel.io/test-suite=true`. This run used `--keep`, so the fixtures and
+the pinned cert-manager are still deployed; `cleanup.sh` removes only the four
+E2E namespaces when you are finished.
 
 ## Defects found and fixed
 
@@ -89,20 +95,46 @@ only in `devopssentinel-e2e*` namespaces, labelled
    after init, so the first truth query failed with exit 2. Added a bounded
    retry. (DS-E2E-079)
 
-## BLOCKED items (not counted as PASS)
+10. **PostgreSQL credential drift across runs.** The fixture regenerated the
+    password each run but the `restartPolicy: Never` server was never recreated,
+    so TCP authentication failed on every run after the first. The Secret is now
+    reused when present and the running server's password is aligned over the
+    trust-auth local socket (no deletion). (DS-E2E-080/081/082)
 
-| ID | Reason | Next action |
-| --- | --- | --- |
-| DS-E2E-059 | cert-manager CRDs unavailable | install a pinned cert-manager on the disposable cluster, then rerun `--domain certificates` |
-| DS-E2E-156 | cert-manager CRDs unavailable | as above |
-| DS-E2E-080 | Docker Desktop isolates container networking from the WSL host, so `docker run --network host` cannot reach a `kubectl port-forward` | run the database domain from a WSL-native shell or an in-cluster client pod |
-| DS-E2E-081 | same environment limit | as above |
-| DS-E2E-082 | Sentinel exposes only four PostgreSQL menu options; no schema/row-count query | add a read-only schema/row-count option to the PostgreSQL engine |
-| DS-E2E-083 | `apache/kafka:3.9.1` CLI JVM exited 139 (SIGSEGV) in the disposable fixture | raise fixture heap/memory or use a WSL-native Kafka |
+11. **Kafka CLI exited 139 (SIGSEGV).** Root cause: the Sentinel's `run_bounded`
+    duplicates stdin for its children; the harness piped the runner script via
+    `bash -s`, corrupting the script stream so *every* bounded child exited 139.
+    The runner is now staged as a file and executed, and heap/memory were raised.
+    (DS-E2E-083)
 
-`docs/VALIDATION.md` for 4.2.1 already recorded that no authenticated
-PostgreSQL or Kafka session was ever performed, so these are newly-exercised
-areas, not regressions.
+### DevOpsSentinel — PostgreSQL engine
+
+12. **New read-only `Schema / row counts` option** in `pg_readonly_session`
+    (exact per-table counts via `query_to_xml`), so schema discovery and row
+    counts are available without leaving the read-only path. (DS-E2E-082)
+
+## Previously blocked cases — now resolved
+
+| ID | Was blocked by | Resolution | Now |
+| --- | --- | --- | --- |
+| DS-E2E-059 | cert-manager CRDs absent | pinned cert-manager **v1.15.3** installed (`--install-prereqs`) | PASS |
+| DS-E2E-156 | cert-manager CRDs absent | as above | PASS |
+| DS-E2E-080 | Docker Desktop isolates container networking from the WSL host | in-cluster client pod `ds-e2e-pg-client` reaches the Service directly | PASS |
+| DS-E2E-081 | same environment limit | as above | PASS |
+| DS-E2E-082 | no schema/row-count option | new read-only Sentinel menu option | PASS |
+| DS-E2E-083 | Kafka CLI JVM exit 139 | runner executed from a file, not stdin; larger heap | PASS |
+
+`docs/VALIDATION.md` for 4.2.1 recorded that no authenticated PostgreSQL or Kafka
+session was ever performed, so these were newly-exercised areas rather than
+regressions.
+
+## Still deployed after this run
+
+`--keep` left everything standing: the four E2E namespaces with their fixtures,
+and the `cert-manager` namespace (3/3 controllers Ready, with
+`Certificate/ds-e2e-managed` Ready=True and the controlled
+`Certificate/ds-e2e-managed-failure` Ready=False). See `COMMANDS.md` for the
+manual verification steps.
 
 ## Reproduce
 

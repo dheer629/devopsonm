@@ -1,14 +1,14 @@
 # DevOpsSentinel real WSL E2E validation
 
-Run: 20261003T145408Z; mode: FULL; context: `vcluster-docker_dev`.
+Run: 20261003T160122Z; mode: FULL; context: `vcluster-docker_dev`.
 
-Source SHA-256: `761c141cf9998e224855cc8fb98e7333a5125113c51233e8987459d48a71c722`.
+Source SHA-256: `63a8d8937330a071221de3ccea9bfeccd1fac33965554fec9efc724a3ca4fbe5`.
 
-Private evidence: `/home/dheer/.devopssentinel/real-e2e/20261003T145408Z`.
+Private evidence: `/home/dheer/.devopssentinel/real-e2e/20261003T160122Z`.
 
 **Release gate: NOT APPROVED.** Review failures, blocked coverage and requirement traceability before deployment.
 
-Counts: PASS=81, FAIL=0, BLOCKED=6, NOT_APPLICABLE=1
+Counts: PASS=87, FAIL=0, BLOCKED=0, NOT_APPLICABLE=1
 
 | ID | Domain | Test | Status | Detail |
 |---|---|---|---|---|
@@ -61,8 +61,8 @@ Counts: PASS=81, FAIL=0, BLOCKED=6, NOT_APPLICABLE=1
 | DS-E2E-056 | certificates | Live TLS fingerprint matches mounted Secret | PASS |  |
 | DS-E2E-057 | certificates | Different Ingress Secret produces factual mismatch | PASS |  |
 | DS-E2E-058 | certificates | Secret rotation refresh and server reload | PASS |  |
-| DS-E2E-059 | certificates | Real cert-manager issuance and CertificateRequest | BLOCKED | cert-manager CRDs are unavailable after prerequisite setup |
-| DS-E2E-156 | certificates | Real cert-manager missing Issuer failure | BLOCKED | cert-manager CRDs are unavailable after prerequisite setup |
+| DS-E2E-059 | certificates | Real cert-manager issuance and CertificateRequest | PASS |  |
+| DS-E2E-156 | certificates | Real cert-manager missing Issuer failure | PASS |  |
 | DS-E2E-157 | certificates | Certificate JSON/export and private-key redaction | PASS |  |
 | DS-E2E-158 | certificates | Future certificate validity is explicit | PASS |  |
 | DS-E2E-060 | gitops | Suspended Flux resource | PASS |  |
@@ -76,10 +76,10 @@ Counts: PASS=81, FAIL=0, BLOCKED=6, NOT_APPLICABLE=1
 | DS-E2E-068 | gitops | Second local commit, revision gap and recovery | PASS |  |
 | DS-E2E-069 | gitops | Workload owner and exact Git revision mapping | PASS |  |
 | DS-E2E-079 | database | PostgreSQL Service, endpoint and port discovery | PASS |  |
-| DS-E2E-080 | database | PostgreSQL real read-only SELECTs and credential lifecycle | BLOCKED | PostgreSQL integration requires the tools container to reach the kubectl port-forward on 127.0.0.1:33919. Docker Desktop isolates container networking from the WSL host, so `docker run --network host` cannot reach a port-forward created in the Ubuntu distro. Next action: run this domain from a WSL-native shell without Docker Desktop network isolation, or use an in-cluster client pod. Environment limit, not a DevOpsSentinel defect. |
-| DS-E2E-081 | database | PostgreSQL wrong password, invalid database and unreachable service | BLOCKED | PostgreSQL integration requires the tools container to reach the kubectl port-forward on 127.0.0.1:53969. Docker Desktop isolates container networking from the WSL host, so `docker run --network host` cannot reach a port-forward created in the Ubuntu distro. Next action: run this domain from a WSL-native shell without Docker Desktop network isolation, or use an in-cluster client pod. Environment limit, not a DevOpsSentinel defect. |
-| DS-E2E-082 | database | PostgreSQL schema, row count and audit query capability | BLOCKED | Schema discovery, table row count and audit query are not exposed by the four-option PostgreSQL menu (identity, sizes, activity, long-running); the real fixture confirms public.e2e_audit exists with 3 rows. Next action: add a schema/row-count read-only query option to the Sentinel PostgreSQL engine, then rerun --domain database. This product capability gap is not counted as a pass. |
-| DS-E2E-083 | database | Kafka real broker, messages, topic and consumer group reports | BLOCKED | In-pod Sentinel Kafka run exited 139 (SIGSEGV). The apache/kafka:3.9.1 CLI JVM did not complete inside the disposable WSL fixture. Next action: raise the fixture heap/memory or run against a WSL-native Kafka. Environment/resource limit, not a DevOpsSentinel defect. |
+| DS-E2E-080 | database | PostgreSQL real read-only SELECTs and credential lifecycle | PASS |  |
+| DS-E2E-081 | database | PostgreSQL wrong password, invalid database and unreachable service | PASS |  |
+| DS-E2E-082 | database | PostgreSQL schema, row count and audit query capability | PASS |  |
+| DS-E2E-083 | database | Kafka real broker, messages, topic and consumer group reports | PASS |  |
 | DS-E2E-084 | database | Kafka consumer lag support | NOT_APPLICABLE | Consumer lag is conditional on product support in the request. Sentinel exposes connectivity, topic listing and group listing, but has no lag-report operation; real broker group/offset truth is retained in database/kafka-setup.txt. |
 | DS-E2E-090 | experience | TXT/CSV/JSON/NDJSON exports of a live report | PASS |  |
 | DS-E2E-091 | experience | Machine JSON schema and no-ANSI output | PASS |  |

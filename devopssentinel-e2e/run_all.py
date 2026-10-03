@@ -223,8 +223,30 @@ class Harness:
         self.evidence(name+'.json',data)
         return data
 
+    def install_prerequisites(self):
+        """Install a pinned cert-manager only on this verified disposable local cluster."""
+        crd=self.k(['get','crd','certificates.cert-manager.io','-o','name'])
+        if crd.returncode==0:
+            self.evidence('prereq-cert-manager.json',{'state':'present'}); return
+        if not self.args.install_prereqs:
+            self.evidence('prereq-cert-manager.json',{'state':'absent','installed':False,
+                'hint':'pass --install-prereqs to install pinned cert-manager v1.15.3 on this disposable local cluster'})
+            return
+        url='https://github.com/cert-manager/cert-manager/releases/download/v1.15.3/cert-manager.yaml'
+        applied=self.command(['kubectl','--context',self.context,'apply','-f',url],timeout=240)
+        self.evidence('prereq-cert-manager-install.txt',applied.stdout+applied.stderr)
+        assert applied.returncode==0,'cert-manager install failed'
+        for name in ('cert-manager','cert-manager-cainjector','cert-manager-webhook'):
+            self.wait('deployments',name,lambda r: r.get('status',{}).get('availableReplicas',0)>=1,
+                      ns='cert-manager',timeout=300)
+        self.wait('crd','certificates.cert-manager.io',
+                  lambda r: any(c.get('type')=='Established' and c.get('status')=='True' for c in r.get('status',{}).get('conditions',[])),
+                  timeout=180)
+        self.evidence('prereq-cert-manager.json',{'state':'installed','version':'v1.15.3','url':url})
+
     def setup(self):
         self.safety(); self.baseline=self.snapshot('baseline-before')
+        self.install_prerequisites()
         for ns in NAMESPACES: self.apply({'apiVersion':'v1','kind':'Namespace','metadata':{'name':ns}})
         build=self.command(['docker','build','-t',self.tools_image,'-f',ROOT/'devopssentinel-e2e/Dockerfile',ROOT],timeout=300)
         self.evidence('tools-image-build.txt',build.stdout+build.stderr)
@@ -289,6 +311,7 @@ def main():
     p.add_argument('--context'); p.add_argument('--mode',choices=['QUICK','STANDARD','FULL'],default='FULL')
     p.add_argument('--test',action='append');p.add_argument('--domain',action='append');p.add_argument('--failed',action='store_true')
     p.add_argument('--cleanup-only',action='store_true');p.add_argument('--keep',action='store_true')
+    p.add_argument('--install-prereqs',action='store_true')
     args=p.parse_args(); h=Harness(args)
     if args.cleanup_only: h.cleanup(); return 0
     try:

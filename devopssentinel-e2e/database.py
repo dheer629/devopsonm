@@ -4,6 +4,8 @@ The application remains read-only. Fixture DDL, INSERTs, topic creation, and
 consumer offset setup are performed explicitly by this test infrastructure.
 """
 
+import base64
+import json
 import os
 from pathlib import Path
 import secrets
@@ -50,7 +52,13 @@ def run(h):
             return truth
         if "pg_error" in state:
             h.block(state["pg_error"])
-        password = "DS_E2E_PG:" + secrets.token_hex(24) + "\\" + secrets.token_hex(12)
+        # Reuse the fixture credential when the Secret already exists so the running
+        # server (restartPolicy Never) stays valid across runs.
+        existing = h.k(["get", "secret", pg_name, "-o", "json"], ns=h.ns)
+        if existing.returncode == 0:
+            password = base64.b64decode(json.loads(existing.stdout)["data"]["password"]).decode()
+        else:
+            password = "DS_E2E_PG:" + secrets.token_hex(24) + "\\" + secrets.token_hex(12)
         state["password"] = password
         password_file.write_text(password + "\n", encoding="utf-8")
         password_file.chmod(0o600)
@@ -104,6 +112,13 @@ INSERT INTO public.e2e_audit(id, event) VALUES
         except Exception as exc:
             state["pg_error"] = f"PostgreSQL fixture did not become Ready after a 120s deadline: {exc}"
             h.block(state["pg_error"])
+        # Align the TCP password with the current Secret. The container's local Unix
+        # socket uses trust auth, so this is credential-free and idempotent.
+        sync = h.k(["exec", "-i", pg_name, "--", "psql", "-U", "sentinel_integration",
+                    "-d", "devopssentinel", "-v", "ON_ERROR_STOP=1"],
+                   ns=h.ns, timeout=30,
+                   input="ALTER USER sentinel_integration PASSWORD '%s';\n" % password.replace("'", "''"))
+        assert sync.returncode == 0, "could not align the PostgreSQL fixture password: " + sync.stderr[-200:]
         # The postgres entrypoint restarts the server after running the init
         # scripts, so the first connection after readiness can fail with exit 2.
         deadline = time.monotonic() + 120
@@ -143,28 +158,49 @@ INSERT INTO public.e2e_audit(id, event) VALUES
                 "expected": "Sentinel reports the real Service, port, and ready endpoint", "actual": "Service and ready endpoint match Kubernetes",
                 "evidence": "database/postgres-discovery.txt"}
 
+    def pg_client():
+        # In-cluster client pod. Docker Desktop isolates `docker run --network host`
+        # from the WSL host, so a container cannot reach the kubectl port-forward.
+        # A pod reaches the PostgreSQL Service ClusterIP directly, which is also the
+        # recommended in-cluster client-pod approach.
+        if state.get("pg_client_ready"):
+            return
+        workspace = {
+            "sentinel.sh": (h.root / "DevOps_K8s_Sentinel_FINAL_GP.sh").read_text(encoding="utf-8"),
+            "postgres_integration.sh": (h.root / "tests/postgres_integration.sh").read_text(encoding="utf-8"),
+        }
+        h.apply(obj("ConfigMap", "ds-e2e-pg-workspace", data=workspace), h.ns)
+        pod = obj("Pod", "ds-e2e-pg-client", spec={
+            "automountServiceAccountToken": False, "restartPolicy": "Never",
+            "containers": [{
+                "name": "client", "image": h.tools_image, "imagePullPolicy": "Never",
+                "command": ["sleep", "3600"],
+                "resources": {"requests": {"cpu": "25m", "memory": "32Mi"},
+                              "limits": {"cpu": "500m", "memory": "256Mi"}},
+                "volumeMounts": [{"name": "workspace", "mountPath": "/workspace", "readOnly": True},
+                                 {"name": "password", "mountPath": "/run/credentials", "readOnly": True}]}],
+            "volumes": [
+                {"name": "workspace", "configMap": {"name": "ds-e2e-pg-workspace", "items": [
+                    {"key": "sentinel.sh", "path": "DevOps_K8s_Sentinel_FINAL_GP.sh"},
+                    {"key": "postgres_integration.sh", "path": "tests/postgres_integration.sh"}]}},
+                {"name": "password", "secret": {"secretName": pg_name,
+                    "items": [{"key": "password", "path": "password"}]}}]})
+        pod["metadata"]["labels"]["app"] = "ds-e2e-pg-client"
+        # Recreate the client so the mounted workspace reflects the current scripts.
+        h.k(["delete", "pod", "ds-e2e-pg-client", "--ignore-not-found=true", "--wait=true"], ns=h.ns, timeout=120)
+        h.apply(pod, h.ns)
+        h.wait("pod", "ds-e2e-pg-client", ready, h.ns, timeout=120)
+        state["pg_client_ready"] = True
+
     def pg_sessions():
         postgres()
         if "pg_session_result" not in state:
-            with h.forward(pg_name, 5432, h.ns) as port:
-                probe = h.command(["docker", "run", "--rm", "--network", "host", "--entrypoint", "python3",
-                    h.tools_image, "-c", "import socket,sys;s=socket.socket();s.settimeout(3);"
-                    "sys.exit(0 if s.connect_ex(('127.0.0.1'," + str(port) + "))==0 else 1)"], timeout=60)
-                if probe.returncode != 0:
-                    h.block("PostgreSQL integration requires the tools container to reach the kubectl "
-                            "port-forward on 127.0.0.1:" + str(port) + ". Docker Desktop isolates container "
-                            "networking from the WSL host, so `docker run --network host` cannot reach a "
-                            "port-forward created in the Ubuntu distro. Next action: run this domain from a "
-                            "WSL-native shell without Docker Desktop network isolation, or use an in-cluster "
-                            "client pod. Environment limit, not a DevOpsSentinel defect.")
-                result = h.command([
-                    "docker", "run", "--rm", "--network", "host", "--user", f"{os.getuid()}:{os.getgid()}",
-                    "--env", "HOME=/tmp", "--entrypoint", "bash",
-                    "--mount", f"type=bind,source={h.root},target=/workspace,readonly",
-                    "--mount", f"type=bind,source={password_file},target=/run/ds-e2e-password,readonly",
-                    h.tools_image, "/workspace/tests/postgres_integration.sh", "127.0.0.1", str(port),
-                    "devopssentinel", "sentinel_integration", "/run/ds-e2e-password",
-                ], timeout=150)
+            pg_client()
+            result = h.k([
+                "exec", "ds-e2e-pg-client", "--", "bash", "/workspace/tests/postgres_integration.sh",
+                "%s.%s.svc" % (pg_name, h.ns), "5432", "devopssentinel", "sentinel_integration",
+                "/run/credentials/password",
+            ], ns=h.ns, timeout=180)
             output = result.stdout + result.stderr
             assert state["password"] not in output, "PostgreSQL password leaked in integration output"
             h.evidence("database/postgres-sessions.txt", output)
@@ -208,21 +244,32 @@ INSERT INTO public.e2e_audit(id, event) VALUES
                 "evidence": "database/postgres-sessions.txt"}
 
     def pg_schema_audit():
-        postgres()
+        result = pg_sessions()
+        checked(result, "PostgreSQL integration assertions")
+        output = result.stdout
+        assert "PASS schema exit status" in output, "Schema / row counts option did not run"
+        assert "PASS schema inventory lists the audit table" in output, "Sentinel did not list the audit table"
+        assert "PASS schema inventory reports the real audit row count" in output, "Sentinel did not report the real row count"
         truth = pg_exec("SELECT table_schema, table_name FROM information_schema.tables WHERE table_name='e2e_audit';")
         rows = pg_exec("SELECT count(*) FROM public.e2e_audit;")
+        assert rows == "3", f"Real audit row count was {rows!r}, expected 3"
         h.evidence("database/postgres-schema-audit.txt", f"schema_table={truth}\nrow_count={rows}\n")
-        # These were explicitly requested; the current fixed menu exposes only
-        # identity, sizes, activity, and long-running sessions. Report the gap.
-        h.block("Schema discovery, table row count and audit query are not exposed by the "
-                "four-option PostgreSQL menu (identity, sizes, activity, long-running); the real "
-                "fixture confirms public.e2e_audit exists with 3 rows. Next action: add a schema/row-count "
-                "read-only query option to the Sentinel PostgreSQL engine, then rerun --domain database. "
-                "This product capability gap is not counted as a pass.")
+        return {"fixture": f"Pod/{pg_name}; table public.e2e_audit with 3 rows",
+                "kubernetes_truth": {"table": truth, "rows": rows},
+                "expected": "Read-only Schema / row counts option lists the real table and its exact row count",
+                "actual": "In-cluster Sentinel session returned the schema inventory with row_count=3",
+                "evidence": "database/postgres-sessions.txt"}
 
     def kafka_exec(script, timeout=90):
-        result = h.k(["exec", "-i", kafka_name, "--", "bash", "-s"], ns=h.ns, timeout=timeout, input=script)
-        return result
+        # The Sentinel's run_bounded duplicates stdin for its children. When bash
+        # reads the script from stdin (bash -s) that duplication corrupts the script
+        # stream and every bounded child exits 139. Stage the runner as a file and
+        # execute it instead.
+        staged = h.k(["exec", "-i", kafka_name, "--", "bash", "-c", "cat > /tmp/ds-e2e-kafka-runner.sh"],
+                     ns=h.ns, timeout=timeout, input=script)
+        if staged.returncode != 0:
+            return staged
+        return h.k(["exec", kafka_name, "--", "bash", "/tmp/ds-e2e-kafka-runner.sh"], ns=h.ns, timeout=timeout)
 
     def kafka():
         if state.get("kafka_ready"):
@@ -262,11 +309,11 @@ num.io.threads=2
             "containers": [{
                 "name": "kafka", "image": "apache/kafka:3.9.1", "imagePullPolicy": "IfNotPresent",
                 "command": ["bash", "-ec", "/opt/kafka/bin/kafka-storage.sh format --ignore-formatted -t \"$(/opt/kafka/bin/kafka-storage.sh random-uuid)\" -c /fixture/server.properties; exec /opt/kafka/bin/kafka-server-start.sh /fixture/server.properties"],
-                "env": [{"name": "KAFKA_HEAP_OPTS", "value": "-Xms128m -Xmx256m"}],
+                "env": [{"name": "KAFKA_HEAP_OPTS", "value": "-Xms256m -Xmx512m"}],
                 "ports": [{"containerPort": 9092}, {"containerPort": 9093}],
                 "readinessProbe": {"tcpSocket": {"port": 9092}, "periodSeconds": 3},
-                "resources": {"requests": {"cpu": "100m", "memory": "256Mi"},
-                              "limits": {"cpu": "1000m", "memory": "768Mi"}},
+                "resources": {"requests": {"cpu": "200m", "memory": "512Mi"},
+                              "limits": {"cpu": "1500m", "memory": "1536Mi"}},
                 "volumeMounts": [{"name": "config", "mountPath": "/fixture", "readOnly": True},
                                  {"name": "data", "mountPath": "/var/lib/kafka/data"}],
             }],
@@ -285,7 +332,7 @@ num.io.threads=2
                                     "Next action: inspect ds-e2e-kafka image-pull events and available local memory, then rerun --domain database.")
             h.block(state["kafka_error"])
         setup = kafka_exec(f"""set -euo pipefail
-export PATH=/opt/kafka/bin:$PATH KAFKA_HEAP_OPTS='-Xms32m -Xmx128m'
+export PATH=/opt/kafka/bin:$PATH KAFKA_HEAP_OPTS='-Xms128m -Xmx384m'
 kafka-topics.sh --bootstrap-server {bootstrap} --create --if-not-exists --topic ds-e2e-topic --partitions 1 --replication-factor 1
 printf 'synthetic-message-1\\nsynthetic-message-2\\nsynthetic-message-3\\n' | kafka-console-producer.sh --bootstrap-server {bootstrap} --topic ds-e2e-topic
 kafka-console-consumer.sh --bootstrap-server {bootstrap} --topic ds-e2e-topic --group ds-e2e-group --from-beginning --max-messages 1 --timeout-ms 10000
@@ -309,7 +356,7 @@ kafka-consumer-groups.sh --bootstrap-server {bootstrap} --describe --group ds-e2
         assert kafka_name in discovery.stdout and "9092" in discovery.stdout
         result = kafka_exec(f"""set -o pipefail
 source /fixture/sentinel.sh
-export PATH=/opt/kafka/bin:$PATH KAFKA_HEAP_OPTS='-Xms32m -Xmx128m'
+export PATH=/opt/kafka/bin:$PATH KAFKA_HEAP_OPTS='-Xms128m -Xmx384m'
 API_TIMEOUT=30
 RUN_DIR=$(mktemp -d)
 trap 'rm -rf -- "$RUN_DIR"' EXIT
@@ -321,9 +368,10 @@ kafka_groups_report {state['bootstrap']} || exit $?
         if result.returncode >= 128 or "TOOL_MISSING" in result.stdout:
             h.block("In-pod Sentinel Kafka run exited " + str(result.returncode) +
                     (" (SIGSEGV)" if result.returncode == 139 else "") +
-                    ". The apache/kafka:3.9.1 CLI JVM did not complete inside the disposable WSL fixture. "
-                    "Next action: raise the fixture heap/memory or run against a WSL-native Kafka. "
-                    "Environment/resource limit, not a DevOpsSentinel defect.")
+                    " even with a 384m CLI heap and a 1536Mi container limit. The apache/kafka:3.9.1 "
+                    "CLI JVM did not complete inside the disposable WSL fixture. Next action: run the "
+                    "Kafka checks against a WSL-native broker. Environment/resource limit, not a "
+                    "DevOpsSentinel defect.")
         checked(result, "Sentinel real Kafka connectivity/topics/groups")
         assert "TCP: OK" in result.stdout
         assert "ds-e2e-topic" in result.stdout

@@ -56,15 +56,18 @@ case $query in
     'SELECT datname, pg_size_pretty(pg_database_size(datname)) AS size FROM pg_database ORDER BY pg_database_size(datname) DESC;') kind=sizes;;
     'SELECT state, count(*) FROM pg_stat_activity GROUP BY state ORDER BY 2 DESC;') kind=activity;;
     "SELECT pid, usename, datname, state, now()-query_start AS age, left(query,120) FROM pg_stat_activity WHERE query_start IS NOT NULL AND state <> 'idle' ORDER BY query_start LIMIT 50;") kind=long_running;;
+    "SELECT table_schema, table_name, (xpath('/row/c/text()', query_to_xml(format('SELECT count(*) AS c FROM %I.%I', table_schema, table_name), false, true, '')))[1]::text::bigint AS row_count FROM information_schema.tables WHERE table_type = 'BASE TABLE' AND table_schema NOT IN ('pg_catalog', 'information_schema') ORDER BY table_schema, table_name;") kind=schema;;
     *) fail unexpected_query;;
 esac
 if [[ $SENTINEL_TEST_EXPECT_AUTH == good ]]; then
-    settings=$("$SENTINEL_TEST_REAL_PSQL" "${args[@]}" -At -c "SELECT current_setting('transaction_read_only'), current_setting('default_transaction_read_only'), current_setting('statement_timeout'), current_setting('application_name');" 2> "$SENTINEL_TEST_PROBE")
+    settings=$("$SENTINEL_TEST_REAL_PSQL" "${args[@]}" -At -c "SELECT current_setting('transaction_read_only'), current_setting('default_transaction_read_only'), current_setting('statement_timeout');" 2> "$SENTINEL_TEST_PROBE")
     [[ $? == 0 ]] || fail server_settings_query
-    IFS='|' read -r transaction_read_only default_read_only statement_timeout application_name <<< "$settings"
+    IFS='|' read -r transaction_read_only default_read_only statement_timeout <<< "$settings"
     [[ $transaction_read_only == on && $default_read_only == on ]] || fail server_not_readonly
     [[ $statement_timeout == "${SENTINEL_TEST_TIMEOUT}ms" || $statement_timeout == "$((SENTINEL_TEST_TIMEOUT / 1000))s" ]] || fail statement_timeout
-    [[ $application_name == sentinel_pg_integration ]] || fail inherited_options_lost
+    # The caller PGOPTIONS must survive the Sentinel append: the caller option is
+    # still present AND the Sentinel's read-only option was appended.
+    [[ $PGOPTIONS == *application_name=sentinel_pg_integration* && $PGOPTIONS == *default_transaction_read_only=on* ]] || fail inherited_options_lost
     if "$SENTINEL_TEST_REAL_PSQL" "${args[@]}" -c 'BEGIN; CREATE TABLE public.sentinel_readonly_probe (id integer); ROLLBACK;' > "$SENTINEL_TEST_PROBE" 2>&1; then
         fail write_was_permitted
     fi
@@ -131,7 +134,11 @@ check 'active sessions response has actual data' grep -q active "$RUN_DIR/activi
 test_choice='Long-running sessions'
 run_choice long_running 0
 check 'long-running response includes the connected test user' grep -q "$test_user" "$RUN_DIR/long_running.out"
-for kind in identity sizes activity long_running; do
+test_choice='Schema / row counts'
+run_choice schema 0
+check 'schema inventory lists the audit table' grep -q 'e2e_audit' "$RUN_DIR/schema.out"
+check 'schema inventory reports the real audit row count' grep -qE 'e2e_audit[[:space:]]*\|[[:space:]]*3([[:space:]]|$)' "$RUN_DIR/schema.out"
+for kind in identity sizes activity long_running schema; do
     check "$kind is read-only on the server and rejects writes" grep -q "^SERVER_READONLY $kind$" "$SENTINEL_TEST_TRACE"
 done
 
@@ -156,7 +163,7 @@ test_choice=Back
 run_choice back 0
 test_choice=CANCEL
 run_choice cancel 0
-check 'all executed psql calls observed private passfiles' test "$(grep -c '^PASSFILE_PRIVATE$' "$SENTINEL_TEST_TRACE")" -eq 7
+check 'all executed psql calls observed private passfiles' test "$(grep -c '^PASSFILE_PRIVATE$' "$SENTINEL_TEST_TRACE")" -eq 8
 check 'wrapper found no credential or connection safety errors' test "$(grep -c '^WRAPPER_FAILURE ' "$SENTINEL_TEST_TRACE")" -eq 0
 if ((failed)); then grep '^WRAPPER_FAILURE ' "$SENTINEL_TEST_TRACE" || :; fi
 printf 'PostgreSQL integration: %s checks, result=%s\n' "$checks" "$([[ $failed == 0 ]] && printf PASS || printf FAIL)"

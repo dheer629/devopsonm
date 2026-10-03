@@ -369,7 +369,10 @@ def _run(h, fixtures, temporary):
     def cert_manager(failure=False):
         api = h.k(["get", "crd", "certificates.cert-manager.io", "-o", "name"], timeout=30)
         if api.returncode:
-            h.block("cert-manager CRDs are unavailable after prerequisite setup")
+            h.block("cert-manager CRDs are unavailable. Install the pinned release with "
+                    "`run-all.sh --install-prereqs`, or `kubectl apply -f "
+                    "https://github.com/cert-manager/cert-manager/releases/download/v1.15.3/cert-manager.yaml`, "
+                    "then rerun --domain certificates.")
         name = "ds-e2e-managed-failure" if failure else "ds-e2e-managed"
         if not failure:
             h.apply({"apiVersion": "cert-manager.io/v1", "kind": "Issuer", "metadata": {"name": "ds-e2e-selfsigned", "labels": labels}, "spec": {"selfSigned": {}}}, ns=ns)

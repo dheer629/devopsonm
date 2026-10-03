@@ -4081,13 +4081,14 @@ pg_readonly_session() {
     chmod 600 "$pgpass" || { unset password; rm -f -- "$pgpass"; return 2; }
     printf '%s:%s:%s:%s:%s\n' "$(pgpass_escape "$host")" "$port" "$(pgpass_escape "$db")" "$(pgpass_escape "$user")" "$(pgpass_escape "$password")" > "$pgpass"
     unset password
-    choose 'READ-ONLY POSTGRESQL CHECK' 'Connection / server identity' 'Database sizes' 'Active sessions summary' 'Long-running sessions' 'Back' || { rm -f "$pgpass"; return; }
+    choose 'READ-ONLY POSTGRESQL CHECK' 'Connection / server identity' 'Database sizes' 'Active sessions summary' 'Long-running sessions' 'Schema / row counts' 'Back' || { rm -f "$pgpass"; return; }
     choice=$REPLY
     case $choice in
         'Connection / server identity') query='SELECT current_database(), current_user, version();';;
         'Database sizes') query='SELECT datname, pg_size_pretty(pg_database_size(datname)) AS size FROM pg_database ORDER BY pg_database_size(datname) DESC;';;
         'Active sessions summary') query="SELECT state, count(*) FROM pg_stat_activity GROUP BY state ORDER BY 2 DESC;";;
         'Long-running sessions') query="SELECT pid, usename, datname, state, now()-query_start AS age, left(query,120) FROM pg_stat_activity WHERE query_start IS NOT NULL AND state <> 'idle' ORDER BY query_start LIMIT 50;";;
+        'Schema / row counts') query="SELECT table_schema, table_name, (xpath('/row/c/text()', query_to_xml(format('SELECT count(*) AS c FROM %I.%I', table_schema, table_name), false, true, '')))[1]::text::bigint AS row_count FROM information_schema.tables WHERE table_type = 'BASE TABLE' AND table_schema NOT IN ('pg_catalog', 'information_schema') ORDER BY table_schema, table_name;";;
         *) rm -f "$pgpass"; return;;
     esac
     local PGPASSFILE=$pgpass PGOPTIONS="${PGOPTIONS:-} -c default_transaction_read_only=on -c statement_timeout=$((API_TIMEOUT*1000))" PGPASSWORD=
