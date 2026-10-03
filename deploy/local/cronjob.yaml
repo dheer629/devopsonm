@@ -1,0 +1,85 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: sentinel-kubeconfig
+data:
+  config: |
+    apiVersion: v1
+    kind: Config
+    current-context: in-cluster
+    contexts:
+      - name: in-cluster
+        context:
+          cluster: local
+          user: service-account
+          namespace: devopsonm
+    clusters:
+      - name: local
+        cluster:
+          server: https://kubernetes.default.svc
+          certificate-authority: /var/run/secrets/kubernetes.io/serviceaccount/ca.crt
+    users:
+      - name: service-account
+        user:
+          tokenFile: /var/run/secrets/kubernetes.io/serviceaccount/token
+---
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: sentinel-validation
+spec:
+  schedule: "17 * * * *"
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 1
+  failedJobsHistoryLimit: 1
+  jobTemplate:
+    spec:
+      backoffLimit: 0
+      activeDeadlineSeconds: 180
+      template:
+        spec:
+          serviceAccountName: sentinel-reader
+          restartPolicy: Never
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 10001
+            runAsGroup: 10001
+            fsGroup: 10001
+            seccompProfile:
+              type: RuntimeDefault
+          containers:
+            - name: sentinel
+              image: devopsonm-sentinel:4.2.1
+              imagePullPolicy: Never
+              args: [--live-validate, --context, in-cluster, --namespace, devopsonm, --json, --no-color]
+              env:
+                - name: KUBECONFIG
+                  value: /etc/sentinel/config
+              resources:
+                requests:
+                  cpu: 50m
+                  memory: 96Mi
+                limits:
+                  cpu: 500m
+                  memory: 256Mi
+              securityContext:
+                allowPrivilegeEscalation: false
+                readOnlyRootFilesystem: true
+                capabilities:
+                  drop: [ALL]
+              volumeMounts:
+                - name: config
+                  mountPath: /etc/sentinel
+                  readOnly: true
+                - name: home
+                  mountPath: /home/sentinel
+                - name: tmp
+                  mountPath: /tmp
+          volumes:
+            - name: config
+              configMap:
+                name: sentinel-kubeconfig
+            - name: home
+              emptyDir: {}
+            - name: tmp
+              emptyDir: {}

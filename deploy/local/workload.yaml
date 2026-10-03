@@ -1,0 +1,64 @@
+# Small local reference workload for real inventory/network/dependency checks.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: sentinel-demo
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: sentinel-demo
+  template:
+    metadata:
+      labels:
+        app: sentinel-demo
+    spec:
+      automountServiceAccountToken: false
+      securityContext:
+        runAsUser: 999
+        runAsGroup: 999
+        fsGroup: 999
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          imagePullPolicy: IfNotPresent
+          command: [redis-server, --save, "", --appendonly, "no"]
+          ports:
+            - containerPort: 6379
+          readinessProbe:
+            exec:
+              command: [redis-cli, ping]
+            initialDelaySeconds: 2
+          resources:
+            requests:
+              cpu: 10m
+              memory: 32Mi
+            limits:
+              cpu: 100m
+              memory: 64Mi
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: [ALL]
+          volumeMounts:
+            - name: data
+              mountPath: /data
+      volumes:
+        - name: data
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: sentinel-demo
+spec:
+  selector:
+    app: sentinel-demo
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379

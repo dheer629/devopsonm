@@ -1,0 +1,57 @@
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: sentinel-reader
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: sentinel-reader
+rules:
+  - apiGroups: ["", apps, batch, networking.k8s.io, discovery.k8s.io, autoscaling, policy, metrics.k8s.io, source.toolkit.fluxcd.io, kustomize.toolkit.fluxcd.io, helm.toolkit.fluxcd.io, cert-manager.io, acme.cert-manager.io]
+    resources: [pods, pods/log, services, endpoints, endpointslices, events, persistentvolumeclaims, configmaps, secrets, serviceaccounts, deployments, statefulsets, daemonsets, replicasets, jobs, cronjobs, ingresses, networkpolicies, horizontalpodautoscalers, poddisruptionbudgets, gitrepositories, ocirepositories, helmrepositories, helmcharts, buckets, kustomizations, helmreleases, certificates, certificaterequests, issuers, orders, challenges]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: sentinel-reader
+subjects:
+  - kind: ServiceAccount
+    name: sentinel-reader
+    namespace: devopsonm
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: sentinel-reader
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: devopsonm-sentinel-reader
+rules:
+  - apiGroups: [""]
+    resources: [namespaces, nodes, persistentvolumes]
+    verbs: [get, list]
+  - apiGroups: [storage.k8s.io]
+    resources: [storageclasses, volumeattachments, csidrivers, csinodes]
+    verbs: [get, list]
+  - apiGroups: [metrics.k8s.io]
+    resources: [nodes]
+    verbs: [get, list]
+  - apiGroups: [cert-manager.io]
+    resources: [clusterissuers]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: devopsonm-sentinel-reader
+subjects:
+  - kind: ServiceAccount
+    name: sentinel-reader
+    namespace: devopsonm
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: devopsonm-sentinel-reader

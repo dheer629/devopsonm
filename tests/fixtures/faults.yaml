@@ -1,0 +1,35 @@
+# Explicit opt-in test fixtures. Never included in the Flux deployment.
+apiVersion: v1
+kind: Pod
+metadata:
+  name: sentinel-failed
+  labels:
+    app.kubernetes.io/part-of: sentinel-e2e
+spec:
+  automountServiceAccountToken: false
+  restartPolicy: Never
+  containers:
+    - name: fail
+      image: redis:7-alpine
+      imagePullPolicy: IfNotPresent
+      command: [sh, -c, "echo intentional-e2e-failure; exit 42"]
+      resources:
+        requests:
+          cpu: 5m
+          memory: 8Mi
+        limits:
+          cpu: 50m
+          memory: 32Mi
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: sentinel-pending
+  labels:
+    app.kubernetes.io/part-of: sentinel-e2e
+spec:
+  storageClassName: sentinel-nonexistent-class
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Mi

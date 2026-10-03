@@ -1,0 +1,10 @@
+.qodo/
+.local/
+__pycache__/
+*.pyc
+.env
+*.key
+*.pem
+*.kubeconfig
+evidence/
+test-results/

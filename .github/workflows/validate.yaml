@@ -1,0 +1,22 @@
+name: Validate Sentinel
+on:
+  push:
+    branches: [main]
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  offline-and-container:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Bash syntax and regression tests
+        run: |
+          bash -n DevOps_K8s_Sentinel_FINAL_GP.sh
+          bash DevOps_K8s_Sentinel_FINAL_GP.sh --self-test --no-color
+          bash tests/regression.sh
+          python3 -m py_compile tests/e2e.py
+      - name: Validate non-root container
+        run: |
+          docker build -t devopsonm-sentinel:test .
+          docker run --rm devopsonm-sentinel:test --self-test --no-color
