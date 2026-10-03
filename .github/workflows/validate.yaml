@@ -15,7 +15,7 @@ jobs:
           bash -n DevOps_K8s_Sentinel_FINAL_GP.sh
           bash DevOps_K8s_Sentinel_FINAL_GP.sh --self-test --no-color
           bash tests/regression.sh
-          python3 -m py_compile tests/e2e.py
+          python3 -m py_compile tests/*.py
       - name: Validate non-root container
         run: |
           docker build -t devopsonm-sentinel:test .

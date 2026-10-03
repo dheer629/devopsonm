@@ -1039,12 +1039,17 @@ health_report() {
         failed=$(awk -F '\t' '$1=="FAIL" || $1=="CRITICAL" {n++} END{print n+0}' "$RUN_DIR/findings.tsv")
         warnings=$(awk -F '\t' '$1=="WARN" {n++} END{print n+0}' "$RUN_DIR/findings.tsv")
     fi
-    ((failed>0 && overall!=3)) && overall=1
+    if ((overall!=3)); then
+        case $(cache_status pods) in
+            OK|EMPTY_RESULT) ((failed>0)) && overall=1;;
+            *) overall=4;;
+        esac
+    fi
     printf '\nFINDINGS\nSEVERITY\tCATEGORY\tRESOURCE\tISSUE\tEVIDENCE\n'
     cat -- "$RUN_DIR/findings.tsv"
     printf '\nCOUNTS\tFAIL %s\tWARN %s\tAVAILABLE COLLECTORS %s\tUNKNOWN COLLECTORS %s\n' "$failed" "$warnings" "$ok" "$unknown"
     printf 'INTERPRETATION\tCounts describe observed findings and evidence coverage; no percentage health score. Warning events may describe recovered historical conditions.\n'
-    printf 'EXIT STATUS\t%s\t0=no observed FAIL (coverage may be incomplete); 1=operational FAIL; 3=authentication/API failure\n' "$overall"
+    printf 'EXIT STATUS\t%s\t0=no observed FAIL (optional coverage may be incomplete); 1=operational FAIL; 3=authentication/API failure; 4=required pod inventory unavailable\n' "$overall"
     return "$overall"
 }
 
@@ -3521,18 +3526,18 @@ resource_dependencies() {
               "├── ServiceAccount: "+($p.spec.serviceAccountName // "default"),
               ($p.spec.containers[]? | "├── Container: "+.name+" -> Image: "+.image),
               ($p.spec.initContainers[]? | "├── InitContainer: "+.name+" -> Image: "+.image),
-              ($p.spec.volumes[]? | if .secret.secretName then "├── SecretRef/"+.secret.secretName elif .configMap.name then "├── ConfigMap: "+.configMap.name elif .persistentVolumeClaim.claimName then "├── PVC: "+.persistentVolumeClaim.claimName else empty end)' "$pods"
+              ($p.spec.volumes[]? | if .secret.secretName then "├── SecretRef/"+.secret.secretName elif .configMap.name then "├── ConfigMap: "+.configMap.name elif .persistentVolumeClaim.claimName then "├── PVC: "+.persistentVolumeClaim.claimName else empty end)' "$pods" || return 4
             ;;
         deployment|statefulset|daemonset|replicaset|job|cronjob)
             jq -r --arg kind "$type" --arg n "$name" --slurpfile w "$workloads" '
               def ctrl: ([.metadata.ownerReferences[]? | select(.controller==true)][0] // .metadata.ownerReferences[0]);
               .items[] | . as $p | ctrl as $o |
               ([$w[0].items[] | select(.kind==$o.kind and .metadata.name==$o.name)][0]) as $direct |
-              (if $o.kind=="ReplicaSet" and $direct!=null then ($direct|ctrl) else $o end) as $top |
-              select(($top.kind|ascii_downcase)==($kind|ascii_downcase) and $top.name==$n) |
+              (if ($o.kind=="ReplicaSet" or $o.kind=="Job") and $direct!=null then ($direct|ctrl) else $o end) as $top |
+              select(any([$o,$top][]; ((.kind // "" | ascii_downcase)==($kind|ascii_downcase)) and .name==$n)) |
               "├── Pod: "+.metadata.name+" phase="+(.status.phase // "UNKNOWN")+" node="+(.spec.nodeName // "UNSCHEDULED"),
               (.spec.containers[]? | "│   ├── Container: "+.name+" image="+.image),
-              (.spec.volumes[]? | if .secret.secretName then "│   ├── SecretRef/"+.secret.secretName elif .configMap.name then "│   ├── ConfigMap: "+.configMap.name elif .persistentVolumeClaim.claimName then "│   ├── PVC: "+.persistentVolumeClaim.claimName else empty end)' "$pods"
+              (.spec.volumes[]? | if .secret.secretName then "│   ├── SecretRef/"+.secret.secretName elif .configMap.name then "│   ├── ConfigMap: "+.configMap.name elif .persistentVolumeClaim.claimName then "│   ├── PVC: "+.persistentVolumeClaim.claimName else empty end)' "$pods" || return 4
             ;;
         secret|configmap|pvc|service|certificate|serviceaccount|pv)
             resource_consumers "$type" "$namespace" "$name"; return;;
@@ -3541,13 +3546,17 @@ resource_dependencies() {
         *) printf 'Dependency parser: support for %s is metadata-only.\n' "$type";;
     esac
     printf '\nSERVICE RELATIONSHIPS\n'
-    jq -r --arg n "$name" --arg kind "$type" --slurpfile svc "$services" '
+    jq -r --arg n "$name" --arg kind "$type" --slurpfile svc "$services" --slurpfile w "$workloads" '
       def ctrl: ([.metadata.ownerReferences[]? | select(.controller==true)][0] // .metadata.ownerReferences[0]);
-      .items[] | . as $p | ctrl as $o | select(.metadata.name==$n or $o.name==$n or ($kind|ascii_downcase)=="pod" and .metadata.name==$n) |
+      .items[] | . as $p | ctrl as $o |
+      ([$w[0].items[] | select(.kind==$o.kind and .metadata.name==$o.name)][0]) as $direct |
+      (if ($o.kind=="ReplicaSet" or $o.kind=="Job") and $direct!=null then ($direct|ctrl) else $o end) as $top |
+      select((($kind|ascii_downcase)=="pod" and .metadata.name==$n) or
+        any([$o,$top][]; ((.kind // "" | ascii_downcase)==($kind|ascii_downcase)) and .name==$n)) |
       $p.metadata.labels as $lbl |
-      $svc[0].items[] | select(.spec.selector!=null) | . as $s |
+      $svc[0].items[] | select((.spec.selector // {} | length)>0) | . as $s |
       select([.spec.selector|to_entries[] | ($lbl[.key] // "") == .value] | all) |
-      "├── Service: "+.metadata.name+" type="+(.spec.type // "ClusterIP")+" clusterIP="+(.spec.clusterIP // "-")' "$pods" 2>/dev/null || :
+      "├── Service: "+.metadata.name+" type="+(.spec.type // "ClusterIP")+" clusterIP="+(.spec.clusterIP // "-")' "$pods" || return 4
     printf '\nGITOPS CORRELATION\n'
     deployment_chain_report "$name" 2>/dev/null || :
 }

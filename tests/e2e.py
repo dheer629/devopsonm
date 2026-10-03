@@ -62,7 +62,8 @@ modes = ['resources', 'network', 'storage', 'gitops', 'gitops-graph', 'certifica
          'cert-expiry', 'health', 'triage', 'etdp', 'postgres-discovery', 'kafka-discovery',
          'doctor', 'capabilities', 'live-validate', 'performance', 'snapshot']
 with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
-    jobs = {mode: pool.submit(execute, mode, ['--'+mode], (0, 1, 4)) for mode in modes}
+    jobs = {mode: pool.submit(execute, mode, ['--'+mode],
+                             (0, 1, 4) if mode in ('health', 'triage') else (0,)) for mode in modes}
     reports = {mode: job.result()[0] for mode, job in jobs.items()}
 
 resource_text = '\n'.join((reports.get('resources') or {}).get('lines', []))
@@ -70,7 +71,9 @@ record('pod-inventory-matches-api', all(name in resource_text for name in expect
 live_text = '\n'.join((reports.get('live-validate') or {}).get('lines', []))
 record('required-live-collectors', 'pods=OK PASS' in live_text and 'PARTIAL/FAIL' not in live_text)
 execute('workload-triage', ['--triage-workload', 'Deployment/'+args.workload], (0, 1, 4))
-execute('dependency', ['--dependency', 'Deployment/'+args.workload])
+dependency, _ = execute('dependency', ['--dependency', 'Deployment/'+args.workload])
+if args.namespace == 'devopsonm':
+    record('deployment-service-correlation', 'Service: sentinel-demo' in '\n'.join((dependency or {}).get('lines', [])))
 execute('quiet-resources', ['--resources', '--quiet'], structured=False)
 execute('offline-self-test', ['--self-test'], structured=False)
 execute('ui-debug', ['--ui-debug'], structured=False)

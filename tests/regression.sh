@@ -45,6 +45,22 @@ printf '{"items":[]}\n' > "$CACHE_DIR/pods.json"
 storage_dependency_report > "$RUN_DIR/storage.txt"
 check grep -q 'PVC/pending phase=Pending' "$RUN_DIR/storage.txt"
 check grep -q 'PV: UNBOUND' "$RUN_DIR/storage.txt"
+# Ownerless Pods must not crash workload dependency queries; ReplicaSet and
+# Deployment references must both resolve Services through their matching pods.
+collect_network() { :; }
+collect_workloads() { :; }
+deployment_chain_report() { :; }
+printf '%s\n' '{"items":[{"metadata":{"name":"standalone"},"spec":{},"status":{}},{"metadata":{"name":"app-pod","labels":{"app":"demo"},"ownerReferences":[{"kind":"ReplicaSet","name":"demo-rs","controller":true}]},"spec":{"containers":[{"name":"app","image":"test"}]},"status":{"phase":"Running"}}]}' > "$CACHE_DIR/pods.json"
+printf '%s\n' '{"items":[{"kind":"ReplicaSet","metadata":{"name":"demo-rs","ownerReferences":[{"kind":"Deployment","name":"demo","controller":true}]}}]}' > "$CACHE_DIR/workloads.json"
+printf '%s\n' '{"items":[{"metadata":{"name":"demo-svc"},"spec":{"selector":{"app":"demo"}}}]}' > "$CACHE_DIR/services.json"
+for key in pods workloads services; do cache_record "$key" OK; done
+for target in Deployment/demo ReplicaSet/demo-rs; do
+    resource_dependencies "${target%/*}" fixture "${target#*/}" > "$RUN_DIR/dependency.txt" 2>&1; rc=$?
+    check test "$rc" -eq 0
+    check grep -q 'Service: demo-svc' "$RUN_DIR/dependency.txt"
+    check grep -q 'Pod: app-pod' "$RUN_DIR/dependency.txt"
+    if grep -q 'jq: error' "$RUN_DIR/dependency.txt"; then fail=1; fi
+done
 # Enforce read-only and scope boundaries without invoking kubectl.
 for args in '--namespace=other' '--context=other' '--token=fake' '--raw=/api' '--watch'; do
     scope_args_safe "$args" >/dev/null 2>&1; rc=$?

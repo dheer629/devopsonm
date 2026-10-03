@@ -42,6 +42,9 @@ bash DevOps_K8s_Sentinel_FINAL_GP.sh --self-test --no-color
 bash tests/regression.sh
 python3 tests/e2e.py --context vcluster-docker_dev --namespace devopsonm --workload sentinel-demo
 bash scripts/test-faults.sh vcluster-docker_dev
+python3 tests/access_and_tui.py --context vcluster-docker_dev --namespace devopsonm
 ```
 
-The E2E runner compares live pod names with the Kubernetes API, exercises report modes, JSON and error exits, and verifies evidence checksums, permissions and redaction. Fault testing temporarily creates a failed Pod, pending PVC, short-lived TLS certificate and canary Secret in `devopsonm`, then removes them. It refuses to overwrite existing fixtures. Private outputs are written under `~/.devopssentinel/e2e-results/`; they are not committed. GitHub Actions runs offline and non-root container checks without cluster credentials.
+The E2E runner compares live pod names with the Kubernetes API, exercises report modes, JSON and error exits, and verifies evidence checksums, permissions and redaction. Fault testing temporarily creates a failed Pod, pending PVC, short-lived TLS certificate and canary Secret in `devopsonm`, then removes them. It refuses to overwrite existing fixtures. Access tests use Kubernetes impersonation (requires impersonation permission) to verify real RBAC denials and open pseudo-terminals to check dashboard startup and terminal restoration. Private outputs are written under `~/.devopssentinel/e2e-results/`; they are not committed. GitHub Actions runs offline and non-root container checks without cluster credentials.
+
+See [the recorded validation results and coverage limits](docs/VALIDATION.md).
