@@ -49,8 +49,10 @@ devopssentinel-e2e/
 ├── local_git_server.py   # cluster-internal git smart-HTTP + Helm chart fixture
 ├── Dockerfile            # ds-e2e-tools:local (bash, jq, openssl, git, git-daemon, psql)
 ├── COMMANDS.md           # step-by-step manual command list
+├── verify-all.sh         # read-only end-to-end verification of every scenario
 ├── gitops/README.md
-└── reports/              # generated report, CSV, JSON, VALIDATION_SUMMARY.md
+└── reports/              # generated report, CSV, JSON, VALIDATION_SUMMARY.md,
+                          # E2E_VERIFICATION_RUN.md (real captured output)
 ```
 
 ## 4. Quick start
@@ -143,4 +145,17 @@ If you prefer to do it by hand, see **COMMANDS.md**.
 3. For anything not PASS, open `~/.devopssentinel/real-e2e/<stamp>/<ID>/`.
 4. Re-run just that domain with `--domain ... --keep`.
 5. When finished: `bash devopssentinel-e2e/cleanup.sh`.
+
+## 12. Read-only verification of every scenario
+
+`verify-all.sh` walks the whole environment and prints each command with its real output
+(environment, namespaces, workloads, networking, storage, PKI/TLS, cert-manager, GitOps,
+PostgreSQL, Kafka, the Sentinel itself, and security/redaction). It changes nothing.
+
+```bash
+bash devopssentinel-e2e/verify-all.sh
+```
+
+The captured result of a real run is checked in as
+`reports/E2E_VERIFICATION_RUN.md`.
 
