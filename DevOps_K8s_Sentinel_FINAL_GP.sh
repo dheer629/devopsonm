@@ -18,7 +18,7 @@ umask 077
 
 # 01 Constants and session state
 APP_NAME="DevOpsSentinel"
-APP_VERSION="4.2.1"
+APP_VERSION="4.2.2"
 APP_BUILD="ADVANCED-UX-READ-ONLY-PRODUCTION"
 APP_BUILD_DATE="2026-10-03"
 SOURCE_FILE="${BASH_SOURCE[0]}"
@@ -1810,8 +1810,8 @@ gitops_report() {
           def state:
             if .spec.suspend then "WARN SUSPENDED"
             elif any(.status.conditions[]?; .type=="Stalled" and .status=="True") then "FAIL RECONCILIATION_FAILED"
-            elif any(.status.conditions[]?; .type=="Reconciling" and .status=="True") then "WARN RECONCILIATION_PENDING"
             elif ready.status=="False" then (if .kind=="HelmRelease" then "FAIL HELM_FAILURE" else "FAIL RECONCILIATION_FAILED" end)
+            elif any(.status.conditions[]?; .type=="Reconciling" and .status=="True") then "WARN RECONCILIATION_PENDING"
             elif gen == null then "UNKNOWN OBSERVED_GENERATION"
             elif .metadata.generation!=gen then "WARN GENERATION_DRIFT / RECONCILIATION_PENDING"
             elif ready.status=="True" then "OK NO_DRIFT_EVIDENCE"
@@ -2242,6 +2242,9 @@ certificates_report() {
     collect_text tls_certificates 60 tls_secret_metadata_collect || :
     printf '\nTLS CERTIFICATE METADATA | %s | cache age=%ss\n' "$(cache_status tls_certificates)" "$(cache_age tls_certificates)"
     [[ -s "$CACHE_DIR/tls_certificates.txt" ]] && cat "$CACHE_DIR/tls_certificates.txt"
+    printf '\nDUPLICATE LEAF CERTIFICATES\n'
+    certificate_duplicate_report; collection_rc=$?
+    ((collection_rc>report_rc)) && report_rc=$collection_rc
     certificate_relationships_report
     cert_mounts_report
     if [[ -s "$CACHE_DIR/tls_certificates.txt" ]] && grep -Eq '^\[(EXPIRED|NOT_YET_VALID)\]' "$CACHE_DIR/tls_certificates.txt"; then report_rc=1; fi
@@ -2981,7 +2984,7 @@ json_report_emit() {
         --arg application "$APP_NAME" --arg version "$APP_VERSION" --arg title "$title" \
         --arg context "$SENTINEL_CONTEXT" --arg namespace "$SENTINEL_NAMESPACE" \
         --arg collected "$(timestamp)" --argjson status "$status" \
-        '{application:$application,version:$version,title:$title,context:$context,namespace:$namespace,collected:$collected,exit_status:$status,lines:split("\n")}'
+        '{schema_version:"1.0",application:$application,tool_version:$version,version:$version,title:$title,context:$context,namespace:$namespace,timestamp:$collected,collected:$collected,exit_status:$status,lines:split("\n")}'
 }
 cli_report_output() {
     # Shared noninteractive emitter: default full text, --quiet without the
@@ -3689,15 +3692,43 @@ service_topology_report() {
     collect_network; collect_pods
     printf 'SERVICE / NETWORK TOPOLOGY | namespace=%s\n' "$SENTINEL_NAMESPACE"
     has jq || { network_report; return; }
-    local svc ep pods ing
+    local svc ep pods ing np
     svc=$(json_cache_path services); ep=$(json_cache_path endpointslices); pods=$(json_cache_path pods); ing=$(json_cache_path ingresses)
     jq -r --slurpfile ep "$ep" --slurpfile pods "$pods" --slurpfile ing "$ing" '
       .items[] as $s |
       ([ $ep[0].items[] | select(.metadata.labels["kubernetes.io/service-name"]==$s.metadata.name) ]) as $eps |
+      ([ $pods[0].items[]? | . as $p
+         | select((($s.spec.selector // {}) | length) > 0)
+         | select(all(($s.spec.selector) | to_entries[]; .value == (($p.metadata.labels) // {})[.key])) ]) as $selp |
+      ([ $selp[] | .spec.containers[]?.ports[]?.containerPort ] | unique) as $dp |
       "Service/"+$s.metadata.name+" type="+($s.spec.type // "ClusterIP")+" clusterIP="+($s.spec.clusterIP // "-")+" ports="+([$s.spec.ports[]?|((.port|tostring)+":"+((.targetPort//"-")|tostring))]|join(",")),
-      ([$ing[0].items[] as $i | $i.spec.rules[]?.http.paths[]?.backend.service | select(.name==$s.metadata.name) | $i.metadata.name] | unique[]? | "├── Ingress: "+.),
+      ([$ing[0].items[] as $i | select(any($i.spec.rules[]?.http.paths[]?.backend.service; .name==$s.metadata.name)) | "├── Ingress: "+$i.metadata.name+" hosts="+([$i.spec.rules[]?.host]|join(","))] | unique[]?),
+      ([ $s.spec.ports[]? | select((.targetPort|type)=="number") | .targetPort as $tp
+         | select(($selp|length) > 0) | select(($dp|index($tp)) == null)
+         | "├── PORT_MISMATCH: Service/"+$s.metadata.name+" targetPort="+($tp|tostring)+" not declared by any selected Pod; declared="+($dp|map(tostring)|join(",")) ] | .[]?),
       ($eps[]? | "├── EndpointSlice: "+.metadata.name+" ready="+([.endpoints[]?|select(.conditions.ready!=false)]|length|tostring)+"/"+(.endpoints|length|tostring),
         (.endpoints[]? | "│   └── "+(.addresses|join(","))+" -> "+(.targetRef.kind // "UNKNOWN")+"/"+(.targetRef.name // "UNKNOWN")))' "$svc"
+    np=$(mktemp "$RUN_DIR/netpol.XXXXXX" 2>/dev/null) || np=
+    if [[ -n $np ]] && kctl_ns get networkpolicies -o json > "$np" 2>/dev/null; then
+        printf '\nNETWORK POLICIES\n'
+        jq -r '.items[]? | "NetworkPolicy/"+.metadata.name+" podSelector="+((.spec.podSelector.matchLabels // {})|tojson)+" policyTypes="+((.spec.policyTypes // [])|join(","))+" enforcement=NOT_VERIFIED_BY_CNI"' "$np"
+        [[ $(jq ".items|length" "$np" 2>/dev/null) == 0 ]] && printf 'No NetworkPolicy objects in this namespace.\n'
+    else
+        printf '\nNETWORK POLICIES\nNetworkPolicy inventory unavailable (RBAC, API or jq).\n'
+    fi
+    [[ -n $np ]] && rm -f -- "$np"
+}
+
+dns_inventory_report() {
+    collect_network
+    printf 'SERVICE DNS INVENTORY | namespace=%s | cluster domain=cluster.local\n' "$SENTINEL_NAMESPACE"
+    local svc
+    has jq || { printf 'SERVICE DNS requires jq; ClusterIP inventory unavailable.\n'; return 2; }
+    svc=$(json_cache_path services)
+    jq -r --arg ns "$SENTINEL_NAMESPACE" '
+      .items[]? |
+      "Service/"+.metadata.name+" clusterIP="+(.spec.clusterIP // "-")+" dns: short="+.metadata.name+" ns="+(.metadata.name+"."+$ns)+" svc="+(.metadata.name+"."+$ns+".svc")+" fqdn="+(.metadata.name+"."+$ns+".svc.cluster.local")' "$svc"
+    printf '\nService names resolve inside the cluster through CoreDNS; no external resolver is queried.\n'
 }
 
 storage_dependency_report() {
@@ -3753,6 +3784,75 @@ smart_health_report() {
 # ==============================================================================
 # PKI/TLS command center extensions.
 # ==============================================================================
+
+certificate_duplicate_report() {
+    local raw name encoded pem fingerprint rc report_rc=0 duplicates=0
+    local -A fingerprints=() counts=()
+    has openssl || { printf 'TOOL_MISSING: openssl\n'; return 4; }
+    raw=$(kctl_ns get secrets --field-selector type=kubernetes.io/tls -o 'go-template={{range .items}}{{.metadata.name}}{{"\t"}}{{index .data "tls.crt"}}{{"\n"}}{{end}}' 2>&1); rc=$?
+    ((rc==0)) || { printf 'STATUS: %s\n' "$(classify_error "$rc" "$raw")"; return "$rc"; }
+    while IFS=$'\t' read -r name encoded; do
+        [[ -n $name ]] || continue
+        pem=$(certificate_decode "$encoded" 2>/dev/null)
+        fingerprint=$(printf '%s\n' "$pem" | openssl x509 -noout -fingerprint -sha256 2>/dev/null); rc=$?
+        if ((rc!=0)) || [[ -z $fingerprint ]]; then
+            printf 'PARSE_ERROR: Secret/%s leaf certificate unavailable\n' "$name"; report_rc=1; continue
+        fi
+        fingerprint=${fingerprint#*=}
+        fingerprints[$fingerprint]+="${fingerprints[$fingerprint]:+,}Secret/$name"
+        counts[$fingerprint]=$(( ${counts[$fingerprint]:-0} + 1 ))
+        unset pem encoded
+    done <<< "$raw"
+    for fingerprint in "${!fingerprints[@]}"; do
+        if ((counts[$fingerprint]>1)); then
+            printf 'DUPLICATE SHA256=%s COUNT=%s SECRETS=%s\n' "$fingerprint" "${counts[$fingerprint]}" "${fingerprints[$fingerprint]}"
+            ((duplicates+=1))
+        fi
+    done
+    ((duplicates)) || printf 'No duplicate leaf certificate fingerprints observed\n'
+    printf 'Duplicate groups: %s (matching identity does not establish certificate trust)\n' "$duplicates"
+    return "$report_rc"
+}
+
+tls_secret_compare_report() {
+    local secret=$1 host=$2 port=${3:-443} raw pem secret_fingerprint live_fingerprint target help output rc
+    [[ $secret =~ ^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$ ]] || { printf 'Invalid Secret name\n'; return 2; }
+    tls_valid_target "$host" "$port" || { printf 'INVALID target: provide DNS name/IP and port 1..65535.\n'; return 2; }
+    has openssl || { printf 'TOOL_MISSING: openssl\n'; return 4; }
+    raw=$(kctl_ns get secret "$secret" -o 'go-template={{if index .data "tls.crt"}}{{index .data "tls.crt"}}{{end}}' 2>&1); rc=$?
+    ((rc==0)) || { printf 'STATUS: %s\n' "$(classify_error "$rc" "$raw")"; return "$rc"; }
+    pem=$(certificate_decode "$raw" 2>/dev/null)
+    secret_fingerprint=$(printf '%s\n' "$pem" | openssl x509 -noout -fingerprint -sha256 2>/dev/null); rc=$?
+    ((rc==0)) && [[ -n $secret_fingerprint ]] || { printf 'PARSE_ERROR: Secret/%s tls.crt leaf certificate unavailable\n' "$secret"; return 1; }
+    secret_fingerprint=${secret_fingerprint#*=}
+    target="$host:$port"; [[ $host == *:* ]] && target="[$host]:$port"
+    help=$(openssl s_client -help 2>&1)
+    [[ $help == *-verify_return_error* ]] || { printf 'TLS VERIFICATION: UNAVAILABLE in local OpenSSL\n'; return 4; }
+    local -a args=(openssl s_client -connect "$target" -servername "$host" -showcerts -verify_return_error)
+    if [[ $host == *:* || $host =~ ^[0-9.]+$ ]]; then
+        [[ $help == *-verify_ip* ]] || { printf 'TLS IDENTITY VERIFICATION: UNAVAILABLE\n'; return 4; }
+        args+=(-verify_ip "$host")
+    else
+        [[ $help == *-verify_hostname* ]] || { printf 'TLS IDENTITY VERIFICATION: UNAVAILABLE\n'; return 4; }
+        args+=(-verify_hostname "$host")
+    fi
+    output=$(run_bounded "$TLS_TIMEOUT" "${args[@]}" </dev/null 2>&1); rc=$?
+    if ((rc!=0)); then
+        printf 'TLS VERIFICATION: FAILED (%s); fingerprint comparison unavailable\n' "$(classify_error "$rc" "$output")"
+        case $rc in 124|137|143) return 3;; *) return 1;; esac
+    fi
+    pem=$(printf '%s\n' "$output" | awk '/-----BEGIN CERTIFICATE-----/{p=1} p{print} /-----END CERTIFICATE-----/{exit}')
+    live_fingerprint=$(printf '%s\n' "$pem" | openssl x509 -noout -fingerprint -sha256 2>/dev/null); rc=$?
+    ((rc==0)) && [[ -n $live_fingerprint ]] || { printf 'PARSE_ERROR: endpoint leaf certificate unavailable\n'; return 1; }
+    live_fingerprint=${live_fingerprint#*=}
+    printf 'SECRET/LIVE CERTIFICATE COMPARISON | namespace=%s | Secret/%s | endpoint=%s\n' "$SENTINEL_NAMESPACE" "$secret" "$target"
+    printf 'SECRET SHA256: %s\nLIVE SHA256: %s\nTLS VERIFICATION: VERIFIED\n' "$secret_fingerprint" "$live_fingerprint"
+    if [[ $secret_fingerprint == "$live_fingerprint" ]]; then
+        printf 'RESULT: MATCH (same leaf certificate fingerprint)\n'; return 0
+    fi
+    printf 'RESULT: MISMATCH (different leaf fingerprints; cause not established)\n'
+    return 1
+}
 
 cert_status_from_dates() {
     local before=$1 after=$2
@@ -3831,33 +3931,53 @@ certificate_dependency_report() {
 }
 
 certificate_trust_secret_report() {
-    local secret=$1 row cert64 ca64 certfile cafile chain_count rc verify subject issuer
+    local secret=$1 row cert64 ca64 certfile cafile leaf intermediates chain_count rc verify subject issuer report_rc=0
     [[ $secret =~ ^[a-z0-9]([-a-z0-9.]*[a-z0-9])?$ ]] || { printf 'Invalid Secret name\n'; return 2; }
-    has openssl || { printf 'TOOL_MISSING: openssl\n'; return 0; }
-    row=$(kctl_ns get secret "$secret" -o 'go-template={{index .data "tls.crt"}}{{"\t"}}{{index .data "ca.crt"}}' 2>&1); rc=$?
+    has openssl || { printf 'TOOL_MISSING: openssl\n'; return 4; }
+    row=$(kctl_ns get secret "$secret" -o 'go-template={{if index .data "tls.crt"}}{{index .data "tls.crt"}}{{end}}{{"\t"}}{{if index .data "ca.crt"}}{{index .data "ca.crt"}}{{end}}' 2>&1); rc=$?
     ((rc==0)) || { printf 'STATUS: %s\n' "$(classify_error "$rc" "$row")"; return "$rc"; }
-    IFS=$'\t' read -r cert64 ca64 <<< "$row"
+    # read with a whitespace IFS would collapse an empty tls.crt field and
+    # incorrectly treat ca.crt as the leaf certificate.
+    cert64=${row%%$'\t'*}; ca64=
+    [[ $row == *$'\t'* ]] && ca64=${row#*$'\t'}
     [[ -n $cert64 ]] || { printf 'Certificate tls.crt not present\n'; return 1; }
     certfile=$(mktemp "$RUN_DIR/trust-cert.XXXXXXXX.pem") || return 2
-    cafile=$(mktemp "$RUN_DIR/trust-ca.XXXXXXXX.pem") || return 2
+    cafile=$(mktemp "$RUN_DIR/trust-ca.XXXXXXXX.pem") || { rm -f -- "$certfile"; return 2; }
+    leaf=$(mktemp "$RUN_DIR/trust-leaf.XXXXXXXX.pem") || { rm -f -- "$certfile" "$cafile"; return 2; }
+    intermediates=$(mktemp "$RUN_DIR/trust-intermediates.XXXXXXXX.pem") || { rm -f -- "$certfile" "$cafile" "$leaf"; return 2; }
     chmod 600 "$certfile" "$cafile" 2>/dev/null || :
-    certificate_decode "$cert64" > "$certfile" 2>/dev/null || { printf 'PARSE_ERROR: tls.crt base64\n'; rm -f "$certfile" "$cafile"; return 1; }
-    [[ -n $ca64 ]] && certificate_decode "$ca64" > "$cafile" 2>/dev/null || :
-    chain_count=$(grep -c 'BEGIN CERTIFICATE' "$certfile" 2>/dev/null || printf 0)
+    if ! certificate_decode "$cert64" > "$certfile" 2>/dev/null ||
+       ! openssl x509 -in "$certfile" -out "$leaf" 2>/dev/null; then
+        printf 'PARSE_ERROR: tls.crt is not a valid X.509 certificate\n'
+        rm -f -- "$certfile" "$cafile" "$leaf" "$intermediates"; return 1
+    fi
+    if [[ -n $ca64 ]]; then
+        if ! certificate_decode "$ca64" > "$cafile" 2>/dev/null || ! openssl x509 -in "$cafile" -noout >/dev/null 2>&1; then
+            printf 'PARSE_ERROR: ca.crt is not a valid X.509 certificate\n'
+            rm -f -- "$certfile" "$cafile" "$leaf" "$intermediates"; return 1
+        fi
+    fi
+    chain_count=$(grep -c 'BEGIN CERTIFICATE' "$certfile" 2>/dev/null || :)
+    awk '/-----BEGIN CERTIFICATE-----/{n++} n>1{print}' "$certfile" > "$intermediates"
     subject=$(openssl x509 -in "$certfile" -noout -subject -nameopt RFC2253 2>/dev/null | sed 's/^subject=//')
     issuer=$(openssl x509 -in "$certfile" -noout -issuer -nameopt RFC2253 2>/dev/null | sed 's/^issuer=//')
     printf 'TRUST CHAIN ANALYZER | Secret/%s\n' "$secret"
     printf 'CHAIN LENGTH       : %s\nLEAF SUBJECT       : %s\nLEAF ISSUER        : %s\n' "$chain_count" "${subject:-UNKNOWN}" "${issuer:-UNKNOWN}"
     openssl x509 -in "$certfile" -noout -dates -serial -fingerprint -sha256 2>/dev/null | redact
     if [[ -s $cafile ]]; then
-        verify=$(run_bounded "$TLS_TIMEOUT" openssl verify -CAfile "$cafile" "$certfile" 2>&1); rc=$?
+        local -a verify_args=(openssl verify -CAfile "$cafile")
+        [[ -s $intermediates ]] && verify_args+=(-untrusted "$intermediates")
+        verify=$(run_bounded "$TLS_TIMEOUT" "${verify_args[@]}" "$leaf" 2>&1); rc=$?
         printf 'VERIFY RESULT      : %s\n' "$verify" | redact
-        ((rc==0)) && printf 'CHAIN STATUS       : VERIFIED AGAINST ca.crt\n' || printf 'CHAIN STATUS       : VERIFY_FAILED\n'
+        if ((rc==0)); then printf 'CHAIN STATUS       : VERIFIED AGAINST ca.crt\n'
+        else printf 'CHAIN STATUS       : VERIFY_FAILED\n'; report_rc=1; fi
     else
         printf 'VERIFY RESULT      : UNKNOWN (ca.crt not present in Secret)\nCHAIN STATUS       : UNKNOWN\n'
+        report_rc=4
     fi
-    if [[ $subject == "$issuer" ]]; then printf 'SELF-SIGNED         : YES\n'; else printf 'SELF-SIGNED         : NO/UNKNOWN\n'; fi
-    rm -f -- "$certfile" "$cafile"
+    if [[ -n $subject && $subject == "$issuer" ]]; then printf 'SELF-ISSUED         : YES (subject equals issuer; signature is a separate check)\n'; else printf 'SELF-ISSUED         : NO\n'; fi
+    rm -f -- "$certfile" "$cafile" "$leaf" "$intermediates"
+    return "$report_rc"
 }
 
 certificate_trust_menu() {
@@ -3885,12 +4005,12 @@ certificate_health_summary() {
 }
 
 certificates_menu() {
-    local choice path warning critical attention
+    local choice path warning critical attention secret host port
     while :; do
         choose 'PKI / CERTIFICATE / TLS OPERATIONS COMMAND CENTER' \
           'Certificate health summary' 'Certificate inventory' 'Certificate expiry audit' 'cert-manager audit' \
           'Mounted certificate discovery' 'Certificate dependency graph' 'Trust chain analyzer' 'Live TLS endpoint inspector' \
-          'Webhook CA certificates' 'Selected filesystem certificate' 'Expiry thresholds' 'Back' || return
+          'Webhook CA certificates' 'Selected filesystem certificate' 'Duplicate fingerprints' 'Compare Secret with TLS endpoint' 'Expiry thresholds' 'Back' || return
         choice=$REPLY
         case $choice in
             'Certificate health summary') show_report 'Certificate health summary' certificate_health_summary;;
@@ -3903,6 +4023,12 @@ certificates_menu() {
             'Live TLS endpoint inspector') tls_menu;;
             'Webhook CA certificates') show_report 'Webhook CA certificates' webhook_certificates_report;;
             'Selected filesystem certificate') prompt 'Explicit certificate file (.crt/.cer/.pem; metadata only):' || continue; path=$REPLY; [[ -n $path ]] && show_report 'Filesystem certificate' filesystem_certificate_report "$path";;
+            'Duplicate fingerprints') show_report 'Duplicate leaf certificates' certificate_duplicate_report;;
+            'Compare Secret with TLS endpoint')
+                prompt 'TLS Secret name:' || continue; secret=$REPLY
+                prompt 'DNS host or IP (no URL scheme):' || continue; host=$REPLY
+                prompt 'Port [443]:' || continue; port=${REPLY:-443}
+                show_report 'Secret/live certificate comparison' tls_secret_compare_report "$secret" "$host" "$port";;
             'Expiry thresholds')
                 prompt "Critical days [$CERT_CRIT_DAYS]:"; critical=${REPLY:-$CERT_CRIT_DAYS}
                 prompt "Warning days [$CERT_WARN_DAYS]:"; warning=${REPLY:-$CERT_WARN_DAYS}
@@ -3934,18 +4060,26 @@ pg_discover_report() {
 
 pg_validate_field() { [[ $1 =~ ^[A-Za-z0-9._:-]+$ && $1 != -* ]]; }
 
+pgpass_escape() {
+    local value=$1
+    value=${value//\\/\\\\}
+    value=${value//:/\\:}
+    printf '%s' "$value"
+}
+
 pg_readonly_session() {
-    local host port db user password pgpass choice query rc
-    has psql || { printf 'TOOL_MISSING: psql\n'; return 0; }
+    local host port db user password pgpass choice query rc output
+    has psql || { printf 'TOOL_MISSING: psql\n'; return 4; }
     prompt 'PostgreSQL host/IP:' || return; host=$REPLY
     prompt 'Port [5432]:' || return; port=${REPLY:-5432}
     prompt 'Database:' || return; db=$REPLY
     prompt 'Username:' || return; user=$REPLY
-    pg_validate_field "$host" && [[ $port =~ ^[0-9]{1,5}$ ]] && pg_validate_field "$db" && pg_validate_field "$user" || { printf 'Invalid connection field\n'; return 2; }
+    pg_validate_field "$host" && [[ $port =~ ^[0-9]{1,5}$ ]] && ((10#$port>0 && 10#$port<=65535)) && pg_validate_field "$db" && pg_validate_field "$user" || { printf 'Invalid connection field\n'; return 2; }
     printf 'Password (input hidden): ' >&2; IFS= read -r -s password; printf '\n' >&2
+    [[ $password != *$'\r'* && $password != *$'\n'* ]] || { unset password; printf 'Invalid password control character\n'; return 2; }
     pgpass=$(mktemp "$RUN_DIR/pgpass.XXXXXXXX") || return 2
-    chmod 600 "$pgpass" || return 2
-    printf '%s:%s:%s:%s:%s\n' "$host" "$port" "$db" "$user" "$password" > "$pgpass"
+    chmod 600 "$pgpass" || { unset password; rm -f -- "$pgpass"; return 2; }
+    printf '%s:%s:%s:%s:%s\n' "$(pgpass_escape "$host")" "$port" "$(pgpass_escape "$db")" "$(pgpass_escape "$user")" "$(pgpass_escape "$password")" > "$pgpass"
     unset password
     choose 'READ-ONLY POSTGRESQL CHECK' 'Connection / server identity' 'Database sizes' 'Active sessions summary' 'Long-running sessions' 'Back' || { rm -f "$pgpass"; return; }
     choice=$REPLY
@@ -3956,11 +4090,14 @@ pg_readonly_session() {
         'Long-running sessions') query="SELECT pid, usename, datname, state, now()-query_start AS age, left(query,120) FROM pg_stat_activity WHERE query_start IS NOT NULL AND state <> 'idle' ORDER BY query_start LIMIT 50;";;
         *) rm -f "$pgpass"; return;;
     esac
-    PGPASSFILE=$pgpass; export PGPASSFILE
-    run_bounded "$API_TIMEOUT" psql -X --no-psqlrc -v ON_ERROR_STOP=1 -h "$host" -p "$port" -U "$user" -d "$db" -P pager=off -c "$query" 2>&1 | redact
-    rc=${PIPESTATUS[0]}
-    unset PGPASSFILE; rm -f -- "$pgpass"
-    printf 'STATUS: %s\n' "$(classify_error "$rc" 'psql read-only query')"
+    local PGPASSFILE=$pgpass PGOPTIONS="${PGOPTIONS:-} -c default_transaction_read_only=on -c statement_timeout=$((API_TIMEOUT*1000))" PGPASSWORD=
+    # An empty local exported value masks an inherited password. Unsetting a
+    # local variable can expose the outer exported binding to child processes.
+    export PGPASSFILE PGOPTIONS PGPASSWORD
+    output=$(run_bounded "$API_TIMEOUT" psql -X --no-psqlrc -w -v ON_ERROR_STOP=1 -h "$host" -p "$port" -U "$user" -d "$db" -P pager=off -c "$query" 2>&1); rc=$?
+    printf '%s\n' "$output" | redact
+    rm -f -- "$pgpass"
+    printf 'STATUS: %s\n' "$(classify_error "$rc" "$output")"
     log_audit "postgres read-only check host=$host port=$port db=$db user=$user rc=$rc"
     return "$rc"
 }
@@ -3977,7 +4114,20 @@ postgres_menu() {
 
 kafka_topics_bin() { command -v kafka-topics.sh 2>/dev/null || command -v kafka-topics 2>/dev/null || :; }
 kafka_groups_bin() { command -v kafka-consumer-groups.sh 2>/dev/null || command -v kafka-consumer-groups 2>/dev/null || :; }
-kafka_valid_bootstrap() { [[ $1 =~ ^[A-Za-z0-9._:-]+(,[A-Za-z0-9._:-]+)*$ && $1 != -* ]]; }
+kafka_valid_bootstrap() {
+    local server host port
+    local -a servers=()
+    [[ -n $1 && $1 != ,* && $1 != *, && $1 != *,,* ]] || return 1
+    IFS=, read -r -a servers <<< "$1"
+    for server in "${servers[@]}"; do
+        if [[ $server =~ ^\[([[:xdigit:]:]+)\]:([0-9]{1,5})$ ]]; then
+            host=${BASH_REMATCH[1]} port=${BASH_REMATCH[2]}
+        elif [[ $server =~ ^([a-zA-Z0-9][a-zA-Z0-9.-]*):([0-9]{1,5})$ ]]; then
+            host=${BASH_REMATCH[1]} port=${BASH_REMATCH[2]}
+        else return 1; fi
+        tls_valid_target "$host" "$port" || return 1
+    done
+}
 
 kafka_discovery_report() {
     local raw rc kt kg
@@ -4000,35 +4150,45 @@ kafka_config_visibility() {
 }
 
 kafka_connectivity_report() {
-    local bootstrap=$1 first host port out rc
+    local bootstrap=$1 server host port out rc report_rc=0
+    local -a servers=()
     kafka_valid_bootstrap "$bootstrap" || { printf 'Invalid bootstrap server list\n'; return 2; }
-    first=${bootstrap%%,*}; host=${first%:*}; port=${first##*:}
-    [[ $port =~ ^[0-9]{1,5}$ ]] || { printf 'Invalid bootstrap port\n'; return 2; }
-    out=$(run_bounded 5 bash -c 'exec 3<>"/dev/tcp/$1/$2"' sentinel-kafka "$host" "$port" 2>&1); rc=$?
-    printf 'BOOTSTRAP: %s\nTCP: %s\n' "$bootstrap" "$(classify_error "$rc" "$out")"
+    IFS=, read -r -a servers <<< "$bootstrap"
+    for server in "${servers[@]}"; do
+        host=${server%:*}; host=${host#\[}; host=${host%\]}; port=${server##*:}
+        out=$(run_bounded 5 bash -c 'exec 3<>"/dev/tcp/$1/$2"' sentinel-kafka "$host" "$port" 2>&1); rc=$?
+        printf 'BOOTSTRAP: %s\nTCP: %s\n' "$server" "$(classify_error "$rc" "$out")"
+        ((rc==0)) || report_rc=$rc
+    done
+    return "$report_rc"
 }
 
 kafka_topics_report() {
-    local bootstrap=$1 config=${2:-} bin rc; bin=$(kafka_topics_bin)
-    [[ -n $bin ]] || { printf 'TOOL_MISSING: kafka-topics\n'; return 0; }
+    local bootstrap=$1 config=${2:-} bin rc output; bin=$(kafka_topics_bin)
+    [[ -n $bin ]] || { printf 'TOOL_MISSING: kafka-topics\n'; return 4; }
     kafka_valid_bootstrap "$bootstrap" || { printf 'Invalid bootstrap server list\n'; return 2; }
     local -a args=("$bin" --bootstrap-server "$bootstrap")
     [[ -n $config ]] && args+=(--command-config "$config")
     args+=(--list)
-    kafka_config_visibility "$config" || :
-    run_bounded "$API_TIMEOUT" "${args[@]}" 2>&1 | redact; rc=${PIPESTATUS[0]}
-    printf 'STATUS: %s\n' "$(classify_error "$rc" 'kafka topics')"
+    kafka_config_visibility "$config" || return $?
+    output=$(run_bounded "$API_TIMEOUT" "${args[@]}" 2>&1); rc=$?
+    printf '%s\n' "$output" | redact
+    printf 'STATUS: %s\n' "$(classify_error "$rc" "$output")"
+    return "$rc"
 }
 
 kafka_groups_report() {
-    local bootstrap=$1 config=${2:-} bin rc; bin=$(kafka_groups_bin)
-    [[ -n $bin ]] || { printf 'TOOL_MISSING: kafka-consumer-groups\n'; return 0; }
+    local bootstrap=$1 config=${2:-} bin rc output; bin=$(kafka_groups_bin)
+    [[ -n $bin ]] || { printf 'TOOL_MISSING: kafka-consumer-groups\n'; return 4; }
     kafka_valid_bootstrap "$bootstrap" || { printf 'Invalid bootstrap server list\n'; return 2; }
     local -a args=("$bin" --bootstrap-server "$bootstrap")
     [[ -n $config ]] && args+=(--command-config "$config")
     args+=(--list)
-    run_bounded "$API_TIMEOUT" "${args[@]}" 2>&1 | redact; rc=${PIPESTATUS[0]}
-    printf 'STATUS: %s\n' "$(classify_error "$rc" 'kafka groups')"
+    kafka_config_visibility "$config" || return $?
+    output=$(run_bounded "$API_TIMEOUT" "${args[@]}" 2>&1); rc=$?
+    printf '%s\n' "$output" | redact
+    printf 'STATUS: %s\n' "$(classify_error "$rc" "$output")"
+    return "$rc"
 }
 
 kafka_menu() {
@@ -5769,7 +5929,7 @@ parse_cli() {
             --json) JSON_FLAG=1;; --quiet) QUIET_FLAG=1;;
             --kubeconfig) cli_need_value "$@" || return; export KUBECONFIG=$2; KUBECONFIG_MODE=EXPLICIT; shift;;
             --context) cli_need_value "$@" || return; SENTINEL_CONTEXT=$2; shift;;
-            --namespace) cli_need_value "$@" || return; SENTINEL_NAMESPACE=$2; shift;;
+            --namespace|-n) cli_need_value "$@" || return; SENTINEL_NAMESPACE=$2; shift;;
             --output) cli_need_value "$@" || return; OUTPUT_DIR=$2; shift;;
             --refresh) cli_need_value "$@" || return; REFRESH=$2; shift;;
             --api-timeout|--log-timeout|--tls-timeout|--cert-warn-days|--cert-critical-days|--cert-attention-days|--cpu-warn|--cpu-critical|--mem-warn|--mem-critical)

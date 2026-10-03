@@ -1,0 +1,89 @@
+id,domain,title,status,reason,duration_seconds,evidence_path
+DS-E2E-001,workloads,"Healthy Deployment, probes and resources",PASS,,0.961,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-001
+DS-E2E-002,workloads,StatefulSet and PVC template,PASS,,7.825,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-002
+DS-E2E-003,workloads,DaemonSet desired/current/ready,PASS,,0.969,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-003
+DS-E2E-004,workloads,ds-e2e-job-success,PASS,,1.084,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-004
+DS-E2E-005,workloads,ds-e2e-job-failed,PASS,,2.988,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-005
+DS-E2E-006,workloads,CronJob controller creates owned Job,PASS,,28.125,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-006
+DS-E2E-010,workloads,ds-e2e-crash,PASS,,16.224,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-010
+DS-E2E-011,workloads,ds-e2e-image,PASS,,1.539,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-011
+DS-E2E-012,workloads,ds-e2e-missing-config,PASS,,1.518,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-012
+DS-E2E-013,workloads,Impossible node selector; toleration preserved,PASS,,3.061,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-013
+DS-E2E-014,workloads,Running Pod with failed readiness probe,PASS,,1.662,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-014
+DS-E2E-015,workloads,Liveness failure and restart history,PASS,,2.507,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-015
+DS-E2E-016,workloads,Startup probe and started state,PASS,,4.298,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-016
+DS-E2E-017,workloads,Bounded 32Mi OOM failure,PASS,,1.311,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-017
+DS-E2E-020,dependencies,ConfigMap reverse dependencies,PASS,,2.747,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-020
+DS-E2E-021,dependencies,Secret reverse dependencies,PASS,,2.541,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-021
+DS-E2E-022,dependencies,ServiceAccount reverse dependencies,PASS,,2.612,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-022
+DS-E2E-030,networking,Service endpoints plus live HTTP,PASS,,2.454,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-030
+DS-E2E-031,networking,Service without endpoints,PASS,,2.039,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-031
+DS-E2E-032,networking,Named targetPort mapping,PASS,,1.867,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-032
+DS-E2E-033,networking,Service target port mismatch,PASS,,2.454,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-033
+DS-E2E-034,networking,Multiple services select same Deployment,PASS,,3.136,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-034
+DS-E2E-035,networking,NetworkPolicy parsing,PASS,,1.919,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-035
+DS-E2E-036,networking,Cross namespace isolation,PASS,,2.612,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-036
+DS-E2E-037,networking,Real cluster DNS resolution,PASS,,1.576,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-037
+DS-E2E-038,networking,Ingress API graph,PASS,,1.931,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-038
+DS-E2E-040,storage,Bound PVC and PV ownership,PASS,,1.849,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-040
+DS-E2E-041,storage,Pending PVC without StorageClass,PASS,,1.453,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-041
+DS-E2E-070,workloads,Multi-container Pod and successful init,PASS,,1.338,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-070
+DS-E2E-071,workloads,Init container failure,PASS,,1.621,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-071
+DS-E2E-072,security,Live logs and credential redaction,PASS,,1.022,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-072
+DS-E2E-073,events,Previous container logs,PASS,,0.963,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-073
+DS-E2E-074,events,Actual Kubernetes failure event timeline,PASS,,1.414,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-074
+DS-E2E-076,nodes,Real node capacity and scoped reservations,PASS,,1.583,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-076
+DS-E2E-050,certificates,Valid TLS Secret metadata and healthy expiry,PASS,,4.487,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-050
+DS-E2E-051,certificates,Real five-day certificate is critical,PASS,,0.107,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-051
+DS-E2E-052,certificates,Historical X.509 certificate is expired,PASS,,0.138,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-052
+DS-E2E-053,certificates,Complete multi-DNS and IP SAN parsing,PASS,,0.103,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-053
+DS-E2E-054,certificates,Duplicate leaf fingerprint detection,PASS,,1.251,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-054
+DS-E2E-055,certificates,Root/intermediate/leaf trust chain,PASS,,0.951,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-055
+DS-E2E-150,certificates,Omitted intermediate fails trust verification,PASS,,0.9,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-150
+DS-E2E-151,certificates,Root self-issuance and intermediate trust,PASS,,1.748,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-151
+DS-E2E-152,certificates,Actual Secret volume/env and workload ownership,PASS,,3.645,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-152
+DS-E2E-153,certificates,Actual TLS Pod and verified TLS 1.2/1.3,PASS,,2.938,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-153
+DS-E2E-154,certificates,TLS endpoint hostname mismatch fails,PASS,,2.991,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-154
+DS-E2E-155,certificates,Untrusted CA fails live verification,PASS,,1.986,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-155
+DS-E2E-056,certificates,Live TLS fingerprint matches mounted Secret,PASS,,2.105,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-056
+DS-E2E-057,certificates,Different Ingress Secret produces factual mismatch,PASS,,1.499,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-057
+DS-E2E-058,certificates,Secret rotation refresh and server reload,PASS,,7.833,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-058
+DS-E2E-059,certificates,Real cert-manager issuance and CertificateRequest,BLOCKED,cert-manager CRDs are unavailable after prerequisite setup,0.093,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-059
+DS-E2E-156,certificates,Real cert-manager missing Issuer failure,BLOCKED,cert-manager CRDs are unavailable after prerequisite setup,0.091,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-156
+DS-E2E-157,certificates,Certificate JSON/export and private-key redaction,PASS,,4.613,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-157
+DS-E2E-158,certificates,Future certificate validity is explicit,PASS,,0.12,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-158
+DS-E2E-060,gitops,Suspended Flux resource,PASS,,6.094,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-060
+DS-E2E-061,gitops,Failed local Git source with message and transition,PASS,,1.432,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-061
+DS-E2E-062,gitops,Ready local Git source and exact artifact revision,PASS,,1.326,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-062
+DS-E2E-063,gitops,Local Git Kustomization deploys a real workload,PASS,,7.634,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-063
+DS-E2E-064,gitops,Failed Kustomization from missing path,PASS,,1.245,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-064
+DS-E2E-065,gitops,Local Helm chart installs real Deployment and Service,PASS,,1.593,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-065
+DS-E2E-066,gitops,Actual Helm template failure,PASS,,1.371,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-066
+DS-E2E-067,gitops,"GitOps source, inventory and Helm dependency graph",PASS,,1.298,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-067
+DS-E2E-068,gitops,"Second local commit, revision gap and recovery",PASS,,12.043,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-068
+DS-E2E-069,gitops,Workload owner and exact Git revision mapping,PASS,,2.012,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-069
+DS-E2E-079,database,"PostgreSQL Service, endpoint and port discovery",PASS,,7.375,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-079
+DS-E2E-080,database,PostgreSQL real read-only SELECTs and credential lifecycle,BLOCKED,"PostgreSQL integration requires the tools container to reach the kubectl port-forward on 127.0.0.1:33919. Docker Desktop isolates container networking from the WSL host, so `docker run --network host` cannot reach a port-forward created in the Ubuntu distro. Next action: run this domain from a WSL-native shell without Docker Desktop network isolation, or use an in-cluster client pod. Environment limit, not a DevOpsSentinel defect.",0.662,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-080
+DS-E2E-081,database,"PostgreSQL wrong password, invalid database and unreachable service",BLOCKED,"PostgreSQL integration requires the tools container to reach the kubectl port-forward on 127.0.0.1:53969. Docker Desktop isolates container networking from the WSL host, so `docker run --network host` cannot reach a port-forward created in the Ubuntu distro. Next action: run this domain from a WSL-native shell without Docker Desktop network isolation, or use an in-cluster client pod. Environment limit, not a DevOpsSentinel defect.",0.629,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-081
+DS-E2E-082,database,"PostgreSQL schema, row count and audit query capability",BLOCKED,"Schema discovery, table row count and audit query are not exposed by the four-option PostgreSQL menu (identity, sizes, activity, long-running); the real fixture confirms public.e2e_audit exists with 3 rows. Next action: add a schema/row-count read-only query option to the Sentinel PostgreSQL engine, then rerun --domain database. This product capability gap is not counted as a pass.",0.497,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-082
+DS-E2E-083,database,"Kafka real broker, messages, topic and consumer group reports",BLOCKED,"In-pod Sentinel Kafka run exited 139 (SIGSEGV). The apache/kafka:3.9.1 CLI JVM did not complete inside the disposable WSL fixture. Next action: raise the fixture heap/memory or run against a WSL-native Kafka. Environment/resource limit, not a DevOpsSentinel defect.",23.459,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-083
+DS-E2E-084,database,Kafka consumer lag support,NOT_APPLICABLE,"Consumer lag is conditional on product support in the request. Sentinel exposes connectivity, topic listing and group listing, but has no lag-report operation; real broker group/offset truth is retained in database/kafka-setup.txt.",0.099,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-084
+DS-E2E-090,experience,TXT/CSV/JSON/NDJSON exports of a live report,PASS,,1.86,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-090
+DS-E2E-091,experience,Machine JSON schema and no-ANSI output,PASS,,5.701,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-091
+DS-E2E-092,experience,NO_COLOR and --no-color produce zero ANSI,PASS,,3.388,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-092
+DS-E2E-093,experience,Sentinel inventory equals Kubernetes API,PASS,,1.67,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-093
+DS-E2E-094,experience,Dashboard renders at 80/100/120/160 columns,PASS,,2.197,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-094
+DS-E2E-095,experience,Unicode and ASCII glyph modes,PASS,,1.229,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-095
+DS-E2E-096,experience,Read-only guard blocks mutation verbs,PASS,,0.773,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-096
+DS-E2E-097,experience,Global search across resource types,PASS,,21.119,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-097
+DS-E2E-098,experience,Regex and case-insensitive search filter,PASS,,3.563,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-098
+DS-E2E-099,experience,Pagination source with 75 real ConfigMaps,PASS,,3.865,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-099
+DS-E2E-100,experience,Cache LIVE to CACHE to force refresh,PASS,,1.214,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-100
+DS-E2E-101,experience,Triage identifies real fixture failures,PASS,,5.578,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-101
+DS-E2E-102,experience,Forward and reverse dependency mapping,PASS,,6.048,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-102
+DS-E2E-103,experience,Doctor reports real tool availability,PASS,,0.695,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-103
+DS-E2E-104,experience,Performance report measures live collectors,PASS,,4.076,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-104
+DS-E2E-105,experience,Evidence bundle with checksums and redaction,PASS,,7.233,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-105
+DS-E2E-106,experience,Global canary and private-key leak scan,PASS,,0.023,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-106
+DS-E2E-107,experience,Near-limit long name renders within width,PASS,,0.709,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-107
+DS-E2E-108,experience,Incident session local evidence path,PASS,,7.211,/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-108

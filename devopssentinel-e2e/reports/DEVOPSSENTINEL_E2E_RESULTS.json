@@ -1,0 +1,2272 @@
+{
+  "mode": "FULL",
+  "timestamp": "20261003T145408Z",
+  "context": "vcluster-docker_dev",
+  "source_sha256": "761c141cf9998e224855cc8fb98e7333a5125113c51233e8987459d48a71c722",
+  "evidence_root": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z",
+  "counts": {
+    "PASS": 81,
+    "FAIL": 0,
+    "BLOCKED": 6,
+    "NOT_APPLICABLE": 1
+  },
+  "results": [
+    {
+      "id": "DS-E2E-001",
+      "domain": "workloads",
+      "title": "Healthy Deployment, probes and resources",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 0.961,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-001",
+      "expected_api": "Deployment desired/ready/available=2",
+      "actual_api": {
+        "availableReplicas": 2,
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-10-03T14:54:16Z",
+            "lastUpdateTime": "2026-10-03T14:54:16Z",
+            "message": "Deployment has minimum availability.",
+            "reason": "MinimumReplicasAvailable",
+            "status": "True",
+            "type": "Available"
+          },
+          {
+            "lastTransitionTime": "2026-10-03T14:54:14Z",
+            "lastUpdateTime": "2026-10-03T14:54:16Z",
+            "message": "ReplicaSet \"ds-e2e-healthy-77bd9c5548\" has successfully progressed.",
+            "reason": "NewReplicaSetAvailable",
+            "status": "True",
+            "type": "Progressing"
+          }
+        ],
+        "observedGeneration": 1,
+        "readyReplicas": 2,
+        "replicas": 2,
+        "updatedReplicas": 2
+      },
+      "expected_sentinel": "workloads row 2/2 OK",
+      "actual_sentinel": "workloads row 2/2 OK"
+    },
+    {
+      "id": "DS-E2E-002",
+      "domain": "workloads",
+      "title": "StatefulSet and PVC template",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 7.825,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-002",
+      "expected_api": "StatefulSet ready=2 with claim consumers",
+      "actual_api": {
+        "availableReplicas": 2,
+        "collisionCount": 0,
+        "currentReplicas": 2,
+        "currentRevision": "ds-e2e-stateful-57f9895dc8",
+        "observedGeneration": 1,
+        "readyReplicas": 2,
+        "replicas": 2,
+        "updateRevision": "ds-e2e-stateful-57f9895dc8",
+        "updatedReplicas": 2
+      },
+      "expected_sentinel": "ready plus Pod/PVC graph",
+      "actual_sentinel": "ready plus Pod/PVC graph"
+    },
+    {
+      "id": "DS-E2E-003",
+      "domain": "workloads",
+      "title": "DaemonSet desired/current/ready",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 0.969,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-003",
+      "expected_api": "DaemonSet scheduled=ready",
+      "actual_api": {
+        "currentNumberScheduled": 1,
+        "desiredNumberScheduled": 1,
+        "numberAvailable": 1,
+        "numberMisscheduled": 0,
+        "numberReady": 1,
+        "observedGeneration": 1,
+        "updatedNumberScheduled": 1
+      },
+      "expected_sentinel": "OK",
+      "actual_sentinel": "OK"
+    },
+    {
+      "id": "DS-E2E-004",
+      "domain": "workloads",
+      "title": "ds-e2e-job-success",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 1.084,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-004",
+      "expected_api": "Complete=True",
+      "actual_api": {
+        "completionTime": "2026-10-03T14:54:19Z",
+        "conditions": [
+          {
+            "lastProbeTime": "2026-10-03T14:54:19Z",
+            "lastTransitionTime": "2026-10-03T14:54:19Z",
+            "status": "True",
+            "type": "Complete"
+          }
+        ],
+        "ready": 0,
+        "startTime": "2026-10-03T14:54:16Z",
+        "succeeded": 1,
+        "terminating": 0,
+        "uncountedTerminatedPods": {}
+      },
+      "expected_sentinel": "OK",
+      "actual_sentinel": "OK"
+    },
+    {
+      "id": "DS-E2E-005",
+      "domain": "workloads",
+      "title": "ds-e2e-job-failed",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 2.988,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-005",
+      "expected_api": "Failed=True",
+      "actual_api": {
+        "conditions": [
+          {
+            "lastProbeTime": "2026-10-03T14:54:31Z",
+            "lastTransitionTime": "2026-10-03T14:54:31Z",
+            "message": "Job has reached the specified backoff limit",
+            "reason": "BackoffLimitExceeded",
+            "status": "True",
+            "type": "Failed"
+          }
+        ],
+        "failed": 2,
+        "ready": 0,
+        "startTime": "2026-10-03T14:54:16Z",
+        "terminating": 0,
+        "uncountedTerminatedPods": {}
+      },
+      "expected_sentinel": "FAIL",
+      "actual_sentinel": "FAIL"
+    },
+    {
+      "id": "DS-E2E-006",
+      "domain": "workloads",
+      "title": "CronJob controller creates owned Job",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 28.125,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-006",
+      "expected_api": "CronJob scheduled child Job",
+      "actual_api": {
+        "active": [
+          {
+            "apiVersion": "batch/v1",
+            "kind": "Job",
+            "name": "ds-e2e-cron-29850655",
+            "namespace": "devopssentinel-e2e",
+            "resourceVersion": "211937",
+            "uid": "f98436e9-6da9-40db-82c7-3764e86bbabc"
+          }
+        ],
+        "lastScheduleTime": "2026-10-03T14:55:00Z"
+      },
+      "expected_sentinel": "CronJob inventory",
+      "actual_sentinel": "CronJob inventory"
+    },
+    {
+      "id": "DS-E2E-010",
+      "domain": "workloads",
+      "title": "ds-e2e-crash",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 16.224,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-010",
+      "expected_api": "CrashLoopBackOff",
+      "actual_api": "CrashLoopBackOff",
+      "expected_sentinel": "CrashLoopBackOff",
+      "actual_sentinel": "CrashLoopBackOff"
+    },
+    {
+      "id": "DS-E2E-011",
+      "domain": "workloads",
+      "title": "ds-e2e-image",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 1.539,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-011",
+      "expected_api": "ImagePullBackOff",
+      "actual_api": "ErrImagePull",
+      "expected_sentinel": "ErrImagePull",
+      "actual_sentinel": "ErrImagePull"
+    },
+    {
+      "id": "DS-E2E-012",
+      "domain": "workloads",
+      "title": "ds-e2e-missing-config",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 1.518,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-012",
+      "expected_api": "CreateContainerConfigError",
+      "actual_api": "CreateContainerConfigError",
+      "expected_sentinel": "CreateContainerConfigError",
+      "actual_sentinel": "CreateContainerConfigError"
+    },
+    {
+      "id": "DS-E2E-013",
+      "domain": "workloads",
+      "title": "Impossible node selector; toleration preserved",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 3.061,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-013",
+      "expected_api": "Pending + FailedScheduling",
+      "actual_api": {
+        "conditions": [
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:17Z",
+            "message": "0/1 nodes are available: 1 node(s) didn't match Pod's node affinity/selector. preemption: 0/1 nodes are available: 1 Preemption is not helpful for scheduling.",
+            "reason": "Unschedulable",
+            "status": "False",
+            "type": "PodScheduled"
+          }
+        ],
+        "phase": "Pending",
+        "qosClass": "Burstable"
+      },
+      "expected_sentinel": "Pending and scheduler events",
+      "actual_sentinel": "Pending and scheduler events"
+    },
+    {
+      "id": "DS-E2E-014",
+      "domain": "workloads",
+      "title": "Running Pod with failed readiness probe",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 1.662,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-014",
+      "expected_api": "Running Ready=False",
+      "actual_api": {
+        "conditions": [
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:19Z",
+            "status": "True",
+            "type": "PodReadyToStartContainers"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:17Z",
+            "status": "True",
+            "type": "Initialized"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:17Z",
+            "message": "containers with unready status: [main]",
+            "reason": "ContainersNotReady",
+            "status": "False",
+            "type": "Ready"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:17Z",
+            "message": "containers with unready status: [main]",
+            "reason": "ContainersNotReady",
+            "status": "False",
+            "type": "ContainersReady"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:17Z",
+            "status": "True",
+            "type": "PodScheduled"
+          }
+        ],
+        "containerStatuses": [
+          {
+            "containerID": "containerd://3f14081b9297bcb706756eb5b4bcc909c37555331117353ff1af963db2159b45",
+            "image": "docker.io/library/ds-e2e-tools:local",
+            "imageID": "sha256:98929c37306d1e5fb66b32f91e223edeeb18411a9b7f6e5d0ae5221585aa8eb0",
+            "lastState": {},
+            "name": "main",
+            "ready": false,
+            "restartCount": 0,
+            "started": true,
+            "state": {
+              "running": {
+                "startedAt": "2026-10-03T14:54:18Z"
+              }
+            }
+          }
+        ],
+        "hostIP": "172.18.0.2",
+        "hostIPs": [
+          {
+            "ip": "172.18.0.2"
+          }
+        ],
+        "phase": "Running",
+        "podIP": "10.244.0.19",
+        "podIPs": [
+          {
+            "ip": "10.244.0.19"
+          }
+        ],
+        "qosClass": "Burstable",
+        "startTime": "2026-10-03T14:54:17Z"
+      },
+      "expected_sentinel": "0/1 ready",
+      "actual_sentinel": "0/1 ready"
+    },
+    {
+      "id": "DS-E2E-015",
+      "domain": "workloads",
+      "title": "Liveness failure and restart history",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 2.507,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-015",
+      "expected_api": "restarts > 0; probe event",
+      "actual_api": {
+        "conditions": [
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:19Z",
+            "status": "True",
+            "type": "PodReadyToStartContainers"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:18Z",
+            "status": "True",
+            "type": "Initialized"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:55:16Z",
+            "message": "containers with unready status: [main]",
+            "reason": "ContainersNotReady",
+            "status": "False",
+            "type": "Ready"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:55:16Z",
+            "message": "containers with unready status: [main]",
+            "reason": "ContainersNotReady",
+            "status": "False",
+            "type": "ContainersReady"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:18Z",
+            "status": "True",
+            "type": "PodScheduled"
+          }
+        ],
+        "containerStatuses": [
+          {
+            "containerID": "containerd://ea7fa15a956257ec59cb7c3677163f63587a6ca39687b2e6adc241cf6e168842",
+            "image": "docker.io/library/ds-e2e-tools:local",
+            "imageID": "sha256:98929c37306d1e5fb66b32f91e223edeeb18411a9b7f6e5d0ae5221585aa8eb0",
+            "lastState": {
+              "terminated": {
+                "containerID": "containerd://ea7fa15a956257ec59cb7c3677163f63587a6ca39687b2e6adc241cf6e168842",
+                "exitCode": 137,
+                "finishedAt": "2026-10-03T14:55:16Z",
+                "reason": "Error",
+                "startedAt": "2026-10-03T14:55:11Z"
+              }
+            },
+            "name": "main",
+            "ready": false,
+            "restartCount": 4,
+            "started": false,
+            "state": {
+              "waiting": {
+                "message": "back-off 40s restarting failed container=main pod=ds-e2e-liveness_devopssentinel-e2e(ed2ec473-26f4-4bc2-8976-25b5b3b53a57)",
+                "reason": "CrashLoopBackOff"
+              }
+            }
+          }
+        ],
+        "hostIP": "172.18.0.2",
+        "hostIPs": [
+          {
+            "ip": "172.18.0.2"
+          }
+        ],
+        "phase": "Running",
+        "podIP": "10.244.0.20",
+        "podIPs": [
+          {
+            "ip": "10.244.0.20"
+          }
+        ],
+        "qosClass": "Burstable",
+        "startTime": "2026-10-03T14:54:18Z"
+      },
+      "expected_sentinel": "restart and probe event",
+      "actual_sentinel": "restart and probe event"
+    },
+    {
+      "id": "DS-E2E-016",
+      "domain": "workloads",
+      "title": "Startup probe and started state",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 4.298,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-016",
+      "expected_api": "startupProbe defined, started=True",
+      "actual_api": {
+        "conditions": [
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:19Z",
+            "status": "True",
+            "type": "PodReadyToStartContainers"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:18Z",
+            "status": "True",
+            "type": "Initialized"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:21Z",
+            "status": "True",
+            "type": "Ready"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:21Z",
+            "status": "True",
+            "type": "ContainersReady"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:18Z",
+            "status": "True",
+            "type": "PodScheduled"
+          }
+        ],
+        "containerStatuses": [
+          {
+            "containerID": "containerd://fbc5a94b974c6f067d00f466fe6b38ee332b1342c7347ac8e65ab7d3e4cf5fba",
+            "image": "docker.io/library/ds-e2e-tools:local",
+            "imageID": "sha256:98929c37306d1e5fb66b32f91e223edeeb18411a9b7f6e5d0ae5221585aa8eb0",
+            "lastState": {},
+            "name": "main",
+            "ready": true,
+            "restartCount": 0,
+            "started": true,
+            "state": {
+              "running": {
+                "startedAt": "2026-10-03T14:54:19Z"
+              }
+            }
+          }
+        ],
+        "hostIP": "172.18.0.2",
+        "hostIPs": [
+          {
+            "ip": "172.18.0.2"
+          }
+        ],
+        "phase": "Running",
+        "podIP": "10.244.0.21",
+        "podIPs": [
+          {
+            "ip": "10.244.0.21"
+          }
+        ],
+        "qosClass": "Burstable",
+        "startTime": "2026-10-03T14:54:18Z"
+      },
+      "expected_sentinel": "startup probe definition",
+      "actual_sentinel": "startup probe definition"
+    },
+    {
+      "id": "DS-E2E-017",
+      "domain": "workloads",
+      "title": "Bounded 32Mi OOM failure",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 1.311,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-017",
+      "expected_api": "OOMKilled bounded32Mi, restart Never",
+      "actual_api": {
+        "conditions": [
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:23Z",
+            "status": "False",
+            "type": "PodReadyToStartContainers"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:18Z",
+            "status": "True",
+            "type": "Initialized"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:22Z",
+            "reason": "PodFailed",
+            "status": "False",
+            "type": "Ready"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:22Z",
+            "reason": "PodFailed",
+            "status": "False",
+            "type": "ContainersReady"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:18Z",
+            "status": "True",
+            "type": "PodScheduled"
+          }
+        ],
+        "containerStatuses": [
+          {
+            "containerID": "containerd://1fe5085be492c556c1c70142f6ef2327ac461210f0fef65d6dd7791eedff93d2",
+            "image": "docker.io/library/ds-e2e-tools:local",
+            "imageID": "sha256:98929c37306d1e5fb66b32f91e223edeeb18411a9b7f6e5d0ae5221585aa8eb0",
+            "lastState": {},
+            "name": "main",
+            "ready": false,
+            "restartCount": 0,
+            "started": false,
+            "state": {
+              "terminated": {
+                "containerID": "containerd://1fe5085be492c556c1c70142f6ef2327ac461210f0fef65d6dd7791eedff93d2",
+                "exitCode": 137,
+                "finishedAt": "2026-10-03T14:54:22Z",
+                "reason": "OOMKilled",
+                "startedAt": "2026-10-03T14:54:19Z"
+              }
+            }
+          }
+        ],
+        "hostIP": "172.18.0.2",
+        "hostIPs": [
+          {
+            "ip": "172.18.0.2"
+          }
+        ],
+        "phase": "Failed",
+        "podIP": "10.244.0.22",
+        "podIPs": [
+          {
+            "ip": "10.244.0.22"
+          }
+        ],
+        "qosClass": "Burstable",
+        "startTime": "2026-10-03T14:54:18Z"
+      },
+      "expected_sentinel": "OOMKilled",
+      "actual_sentinel": "OOMKilled"
+    },
+    {
+      "id": "DS-E2E-020",
+      "domain": "dependencies",
+      "title": "ConfigMap reverse dependencies",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 2.747,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-020",
+      "expected_api": "live reference from healthy pods",
+      "actual_api": "ds-e2e-config",
+      "expected_sentinel": "reverse Pod consumers",
+      "actual_sentinel": "reverse Pod consumers"
+    },
+    {
+      "id": "DS-E2E-021",
+      "domain": "dependencies",
+      "title": "Secret reverse dependencies",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 2.541,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-021",
+      "expected_api": "live reference from healthy pods",
+      "actual_api": "ds-e2e-secret",
+      "expected_sentinel": "reverse Pod consumers",
+      "actual_sentinel": "reverse Pod consumers"
+    },
+    {
+      "id": "DS-E2E-022",
+      "domain": "dependencies",
+      "title": "ServiceAccount reverse dependencies",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 2.612,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-022",
+      "expected_api": "live reference from healthy pods",
+      "actual_api": "ds-e2e-reader",
+      "expected_sentinel": "reverse Pod consumers",
+      "actual_sentinel": "reverse Pod consumers"
+    },
+    {
+      "id": "DS-E2E-030",
+      "domain": "networking",
+      "title": "Service endpoints plus live HTTP",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 2.454,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-030",
+      "expected_api": "two ready endpoints and successful HTTP",
+      "actual_api": [
+        {
+          "addresses": [
+            {
+              "ip": "10.244.0.10",
+              "nodeName": "dev",
+              "targetRef": {
+                "kind": "Pod",
+                "name": "ds-e2e-healthy-77bd9c5548-rc6s5",
+                "namespace": "devopssentinel-e2e",
+                "uid": "72661ca0-052f-4c84-91a2-ec8e6c4b8094"
+              }
+            },
+            {
+              "ip": "10.244.0.11",
+              "nodeName": "dev",
+              "targetRef": {
+                "kind": "Pod",
+                "name": "ds-e2e-healthy-77bd9c5548-r94b7",
+                "namespace": "devopssentinel-e2e",
+                "uid": "a75824fc-8b04-466b-bfea-0cecf9d3f6f8"
+              }
+            }
+          ],
+          "ports": [
+            {
+              "name": "http",
+              "port": 8080,
+              "protocol": "TCP"
+            }
+          ]
+        }
+      ],
+      "expected_sentinel": "ready=2/2 and live HTTP",
+      "actual_sentinel": "ready=2/2 and live HTTP"
+    },
+    {
+      "id": "DS-E2E-031",
+      "domain": "networking",
+      "title": "Service without endpoints",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 2.039,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-031",
+      "expected_api": "0 ready endpoints",
+      "actual_api": [],
+      "expected_sentinel": "ready=0/0",
+      "actual_sentinel": "ready=0/0"
+    },
+    {
+      "id": "DS-E2E-032",
+      "domain": "networking",
+      "title": "Named targetPort mapping",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 1.867,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-032",
+      "expected_api": "named targetPort http resolves8080",
+      "actual_api": [
+        {
+          "name": "http",
+          "port": 80,
+          "protocol": "TCP",
+          "targetPort": "http"
+        }
+      ],
+      "expected_sentinel": "80:http; endpoint8080",
+      "actual_sentinel": "80:http; endpoint8080"
+    },
+    {
+      "id": "DS-E2E-033",
+      "domain": "networking",
+      "title": "Service target port mismatch",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 2.454,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-033",
+      "expected_api": "target9999 undeclared",
+      "actual_api": [
+        {
+          "name": "http",
+          "port": 80,
+          "protocol": "TCP",
+          "targetPort": 9999
+        }
+      ],
+      "expected_sentinel": "port mismatch/unverified",
+      "actual_sentinel": "port mismatch/unverified"
+    },
+    {
+      "id": "DS-E2E-034",
+      "domain": "networking",
+      "title": "Multiple services select same Deployment",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 3.136,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-034",
+      "expected_api": "multiple selectors same pods",
+      "actual_api": 5,
+      "expected_sentinel": "both services in graph",
+      "actual_sentinel": "both services in graph"
+    },
+    {
+      "id": "DS-E2E-035",
+      "domain": "networking",
+      "title": "NetworkPolicy parsing",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 1.919,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-035",
+      "expected_api": "real ingress NetworkPolicy",
+      "actual_api": {
+        "ingress": [
+          {
+            "from": [
+              {
+                "podSelector": {}
+              }
+            ]
+          }
+        ],
+        "podSelector": {
+          "matchLabels": {
+            "app": "ds-e2e-healthy"
+          }
+        },
+        "policyTypes": [
+          "Ingress"
+        ]
+      },
+      "expected_sentinel": "policy inventory; enforcement separate",
+      "actual_sentinel": "policy inventory; enforcement separate"
+    },
+    {
+      "id": "DS-E2E-036",
+      "domain": "networking",
+      "title": "Cross namespace isolation",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 2.612,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-036",
+      "expected_api": "different namespace pod sets",
+      "actual_api": "devopssentinel-e2e-peer",
+      "expected_sentinel": "isolated reports",
+      "actual_sentinel": "isolated reports"
+    },
+    {
+      "id": "DS-E2E-037",
+      "domain": "networking",
+      "title": "Real cluster DNS resolution",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 1.576,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-037",
+      "expected_api": "all DNS variants resolve",
+      "actual_api": {
+        "ds-e2e-web": "10.103.57.162",
+        "ds-e2e-web.devopssentinel-e2e": "10.103.57.162",
+        "ds-e2e-web.devopssentinel-e2e.svc": "10.103.57.162",
+        "ds-e2e-web.devopssentinel-e2e.svc.cluster.local": "10.103.57.162"
+      },
+      "expected_sentinel": "service FQDN",
+      "actual_sentinel": "service FQDN"
+    },
+    {
+      "id": "DS-E2E-038",
+      "domain": "networking",
+      "title": "Ingress API graph",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 1.931,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-038",
+      "expected_api": "Ingress backend API mapping; no controller",
+      "actual_api": {
+        "rules": [
+          {
+            "host": "ds-e2e.example.local",
+            "http": {
+              "paths": [
+                {
+                  "backend": {
+                    "service": {
+                      "name": "ds-e2e-web",
+                      "port": {
+                        "number": 80
+                      }
+                    }
+                  },
+                  "path": "/",
+                  "pathType": "Prefix"
+                }
+              ]
+            }
+          }
+        ]
+      },
+      "expected_sentinel": "host/backend mapping",
+      "actual_sentinel": "host/backend mapping"
+    },
+    {
+      "id": "DS-E2E-040",
+      "domain": "storage",
+      "title": "Bound PVC and PV ownership",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 1.849,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-040",
+      "expected_api": "PVC Bound to PV; Pod mount",
+      "actual_api": {
+        "accessModes": [
+          "ReadWriteOnce"
+        ],
+        "capacity": {
+          "storage": "64Mi"
+        },
+        "phase": "Bound"
+      },
+      "expected_sentinel": "PVC/PV/class/consumer",
+      "actual_sentinel": "PVC/PV/class/consumer"
+    },
+    {
+      "id": "DS-E2E-041",
+      "domain": "storage",
+      "title": "Pending PVC without StorageClass",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 1.453,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-041",
+      "expected_api": "Pending nonexistent StorageClass",
+      "actual_api": {
+        "phase": "Pending"
+      },
+      "expected_sentinel": "Pending UNBOUND",
+      "actual_sentinel": "Pending UNBOUND"
+    },
+    {
+      "id": "DS-E2E-070",
+      "domain": "workloads",
+      "title": "Multi-container Pod and successful init",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 1.338,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-070",
+      "expected_api": "2 containers and completed init",
+      "actual_api": {
+        "conditions": [
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:20Z",
+            "status": "True",
+            "type": "PodReadyToStartContainers"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:20Z",
+            "status": "True",
+            "type": "Initialized"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:21Z",
+            "status": "True",
+            "type": "Ready"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:21Z",
+            "status": "True",
+            "type": "ContainersReady"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:19Z",
+            "status": "True",
+            "type": "PodScheduled"
+          }
+        ],
+        "containerStatuses": [
+          {
+            "containerID": "containerd://1c1875d2c3907e984433adcd514fc5fe1558ae499773d397d81fc5d05f523816",
+            "image": "docker.io/library/ds-e2e-tools:local",
+            "imageID": "sha256:98929c37306d1e5fb66b32f91e223edeeb18411a9b7f6e5d0ae5221585aa8eb0",
+            "lastState": {},
+            "name": "main",
+            "ready": true,
+            "restartCount": 0,
+            "started": true,
+            "state": {
+              "running": {
+                "startedAt": "2026-10-03T14:54:20Z"
+              }
+            }
+          },
+          {
+            "containerID": "containerd://5c5206881ab7f8d3a33a33d96b0dc4586a0ac7ae0165afb114c0233c88e79335",
+            "image": "docker.io/library/ds-e2e-tools:local",
+            "imageID": "sha256:98929c37306d1e5fb66b32f91e223edeeb18411a9b7f6e5d0ae5221585aa8eb0",
+            "lastState": {},
+            "name": "sidecar",
+            "ready": true,
+            "restartCount": 0,
+            "started": true,
+            "state": {
+              "running": {
+                "startedAt": "2026-10-03T14:54:20Z"
+              }
+            }
+          }
+        ],
+        "hostIP": "172.18.0.2",
+        "hostIPs": [
+          {
+            "ip": "172.18.0.2"
+          }
+        ],
+        "initContainerStatuses": [
+          {
+            "containerID": "containerd://182048a55319cb6e5d7917ab38d9702f9116512f4fb6ae31c435ca288acba2ec",
+            "image": "docker.io/library/ds-e2e-tools:local",
+            "imageID": "sha256:98929c37306d1e5fb66b32f91e223edeeb18411a9b7f6e5d0ae5221585aa8eb0",
+            "lastState": {},
+            "name": "init",
+            "ready": true,
+            "restartCount": 0,
+            "started": false,
+            "state": {
+              "terminated": {
+                "containerID": "containerd://182048a55319cb6e5d7917ab38d9702f9116512f4fb6ae31c435ca288acba2ec",
+                "exitCode": 0,
+                "finishedAt": "2026-10-03T14:54:19Z",
+                "reason": "Completed",
+                "startedAt": "2026-10-03T14:54:19Z"
+              }
+            }
+          }
+        ],
+        "phase": "Running",
+        "podIP": "10.244.0.23",
+        "podIPs": [
+          {
+            "ip": "10.244.0.23"
+          }
+        ],
+        "qosClass": "Burstable",
+        "startTime": "2026-10-03T14:54:19Z"
+      },
+      "expected_sentinel": "all container roles and states",
+      "actual_sentinel": "all container roles and states"
+    },
+    {
+      "id": "DS-E2E-071",
+      "domain": "workloads",
+      "title": "Init container failure",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 1.621,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-071",
+      "expected_api": "init exits1 and restarts",
+      "actual_api": {
+        "conditions": [
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:20Z",
+            "status": "True",
+            "type": "PodReadyToStartContainers"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:19Z",
+            "message": "containers with incomplete status: [init]",
+            "reason": "ContainersNotInitialized",
+            "status": "False",
+            "type": "Initialized"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:19Z",
+            "message": "containers with unready status: [main]",
+            "reason": "ContainersNotReady",
+            "status": "False",
+            "type": "Ready"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:19Z",
+            "message": "containers with unready status: [main]",
+            "reason": "ContainersNotReady",
+            "status": "False",
+            "type": "ContainersReady"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:19Z",
+            "status": "True",
+            "type": "PodScheduled"
+          }
+        ],
+        "containerStatuses": [
+          {
+            "image": "ds-e2e-tools:local",
+            "imageID": "",
+            "lastState": {},
+            "name": "main",
+            "ready": false,
+            "restartCount": 0,
+            "started": false,
+            "state": {
+              "waiting": {
+                "reason": "PodInitializing"
+              }
+            }
+          }
+        ],
+        "hostIP": "172.18.0.2",
+        "hostIPs": [
+          {
+            "ip": "172.18.0.2"
+          }
+        ],
+        "initContainerStatuses": [
+          {
+            "containerID": "containerd://5b070ac95f25a6c5fba706ee4e11cebb72ac8316a9bc35de29f3c08bedbb5a25",
+            "image": "docker.io/library/ds-e2e-tools:local",
+            "imageID": "sha256:98929c37306d1e5fb66b32f91e223edeeb18411a9b7f6e5d0ae5221585aa8eb0",
+            "lastState": {
+              "terminated": {
+                "containerID": "containerd://5b070ac95f25a6c5fba706ee4e11cebb72ac8316a9bc35de29f3c08bedbb5a25",
+                "exitCode": 1,
+                "finishedAt": "2026-10-03T14:55:43Z",
+                "reason": "Error",
+                "startedAt": "2026-10-03T14:55:43Z"
+              }
+            },
+            "name": "init",
+            "ready": false,
+            "restartCount": 4,
+            "started": false,
+            "state": {
+              "waiting": {
+                "message": "back-off 1m20s restarting failed container=init pod=ds-e2e-init-fail_devopssentinel-e2e(8a758f5a-6301-4c46-8ba7-84edd8c75dc6)",
+                "reason": "CrashLoopBackOff"
+              }
+            }
+          }
+        ],
+        "phase": "Pending",
+        "podIP": "10.244.0.24",
+        "podIPs": [
+          {
+            "ip": "10.244.0.24"
+          }
+        ],
+        "qosClass": "Burstable",
+        "startTime": "2026-10-03T14:54:19Z"
+      },
+      "expected_sentinel": "init failure status",
+      "actual_sentinel": "init failure status"
+    },
+    {
+      "id": "DS-E2E-072",
+      "domain": "security",
+      "title": "Live logs and credential redaction",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 1.022,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-072",
+      "expected_api": "real structured/error/canary logs",
+      "actual_api": {
+        "lines": 10
+      },
+      "expected_sentinel": "markers preserved; credentials redacted",
+      "actual_sentinel": "markers preserved; credentials redacted"
+    },
+    {
+      "id": "DS-E2E-073",
+      "domain": "events",
+      "title": "Previous container logs",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 0.963,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-073",
+      "expected_api": "previous instance real crash marker",
+      "actual_api": {
+        "conditions": [
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:17Z",
+            "status": "True",
+            "type": "PodReadyToStartContainers"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:16Z",
+            "status": "True",
+            "type": "Initialized"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:16Z",
+            "message": "containers with unready status: [main]",
+            "reason": "ContainersNotReady",
+            "status": "False",
+            "type": "Ready"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:16Z",
+            "message": "containers with unready status: [main]",
+            "reason": "ContainersNotReady",
+            "status": "False",
+            "type": "ContainersReady"
+          },
+          {
+            "lastProbeTime": null,
+            "lastTransitionTime": "2026-10-03T14:54:16Z",
+            "status": "True",
+            "type": "PodScheduled"
+          }
+        ],
+        "containerStatuses": [
+          {
+            "containerID": "containerd://edfb2260a12bd16f45447d5d2ad6373641bbdae990a9fd3687940e8fab8d7423",
+            "image": "docker.io/library/ds-e2e-tools:local",
+            "imageID": "sha256:98929c37306d1e5fb66b32f91e223edeeb18411a9b7f6e5d0ae5221585aa8eb0",
+            "lastState": {
+              "terminated": {
+                "containerID": "containerd://edfb2260a12bd16f45447d5d2ad6373641bbdae990a9fd3687940e8fab8d7423",
+                "exitCode": 1,
+                "finishedAt": "2026-10-03T14:55:53Z",
+                "reason": "Error",
+                "startedAt": "2026-10-03T14:55:53Z"
+              }
+            },
+            "name": "main",
+            "ready": false,
+            "restartCount": 4,
+            "started": false,
+            "state": {
+              "waiting": {
+                "message": "back-off 1m20s restarting failed container=main pod=ds-e2e-crash_devopssentinel-e2e(6312e25d-7c97-476b-9df1-78b3d5ed2bce)",
+                "reason": "CrashLoopBackOff"
+              }
+            }
+          }
+        ],
+        "hostIP": "172.18.0.2",
+        "hostIPs": [
+          {
+            "ip": "172.18.0.2"
+          }
+        ],
+        "phase": "Running",
+        "podIP": "10.244.0.16",
+        "podIPs": [
+          {
+            "ip": "10.244.0.16"
+          }
+        ],
+        "qosClass": "Burstable",
+        "startTime": "2026-10-03T14:54:16Z"
+      },
+      "expected_sentinel": "previous crash log",
+      "actual_sentinel": "previous crash log"
+    },
+    {
+      "id": "DS-E2E-074",
+      "domain": "events",
+      "title": "Actual Kubernetes failure event timeline",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 1.414,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-074",
+      "expected_api": "real scheduler/image/probe events",
+      "actual_api": [
+        "BackOff",
+        "BackoffLimitExceeded",
+        "Completed",
+        "Created",
+        "ExternalProvisioning",
+        "Failed",
+        "FailedComputeMetricsReplicas",
+        "FailedGetResourceMetric",
+        "FailedScheduling",
+        "Killing",
+        "Provisioning",
+        "ProvisioningFailed",
+        "ProvisioningSucceeded",
+        "Pulled",
+        "Pulling",
+        "SawCompletedJob",
+        "ScalingReplicaSet",
+        "Scheduled",
+        "Started",
+        "SuccessfulCreate",
+        "SuccessfulDelete",
+        "Unhealthy",
+        "WaitForFirstConsumer"
+      ],
+      "expected_sentinel": "reasons, count and timestamps",
+      "actual_sentinel": "reasons, count and timestamps"
+    },
+    {
+      "id": "DS-E2E-076",
+      "domain": "nodes",
+      "title": "Real node capacity and scoped reservations",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 1.583,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-076",
+      "expected_api": "one Ready local node",
+      "actual_api": {
+        "cpu": "24",
+        "ephemeral-storage": "972991057538",
+        "hugepages-1Gi": "0",
+        "hugepages-2Mi": "0",
+        "memory": "7704608Ki",
+        "pods": "110"
+      },
+      "expected_sentinel": "capacity scope and node inventory",
+      "actual_sentinel": "capacity scope and node inventory"
+    },
+    {
+      "id": "DS-E2E-050",
+      "domain": "certificates",
+      "title": "Valid TLS Secret metadata and healthy expiry",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 4.487,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-050",
+      "certificate": {
+        "subject": "CN=ds-e2e.example.local",
+        "issuer": "CN=ds-e2e-intermediate",
+        "not_before": "2026-10-02T14:56:14Z",
+        "not_after": "2027-04-01T14:56:14Z",
+        "serial": "707E2F80A4B1BCAF7BD6E87ACB49141C2510B72",
+        "sha256": "51:71:7B:B8:F4:E5:B4:DA:A8:85:4C:9B:86:F6:AB:20:F0:85:74:92:9A:34:33:6A:50:55:83:79:F9:1E:13:35",
+        "sans": [
+          "ds-e2e.example.local",
+          "ds-e2e-web",
+          "ds-e2e-web.devopssentinel-e2e.svc",
+          "127.0.0.1"
+        ]
+      },
+      "sentinel_row": "devopssentinel-e2e-pki\tSecret/ds-e2e-cert-valid\tds-e2e.example.local\tCN=ds-e2e-intermediate\tApr  1 14:56:14 2027 GMT\t179\tHEALTHY"
+    },
+    {
+      "id": "DS-E2E-051",
+      "domain": "certificates",
+      "title": "Real five-day certificate is critical",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 0.107,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-051",
+      "certificate": {
+        "subject": "CN=ds-e2e-expiring",
+        "issuer": "CN=ds-e2e-intermediate",
+        "not_before": "2026-10-02T14:56:14Z",
+        "not_after": "2026-10-08T14:56:14Z",
+        "serial": "7209882AD8FF973A22C2085CE1082364705A00FA",
+        "sha256": "68:67:04:66:26:3E:C1:B7:AA:1E:81:02:26:58:D5:DC:AD:7B:97:DF:D4:25:A4:51:BA:2B:C8:8D:99:5A:C9:3B",
+        "sans": [
+          "ds-e2e.example.local",
+          "ds-e2e-web",
+          "ds-e2e-web.devopssentinel-e2e.svc",
+          "127.0.0.1"
+        ]
+      },
+      "sentinel_row": "devopssentinel-e2e-pki\tSecret/ds-e2e-cert-expiring\tds-e2e-expiring\tCN=ds-e2e-intermediate\tOct  8 14:56:14 2026 GMT\t4\tCRITICAL"
+    },
+    {
+      "id": "DS-E2E-052",
+      "domain": "certificates",
+      "title": "Historical X.509 certificate is expired",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 0.138,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-052",
+      "certificate": {
+        "subject": "CN=ds-e2e-expired",
+        "issuer": "CN=ds-e2e-intermediate",
+        "not_before": "2026-09-03T14:56:14Z",
+        "not_after": "2026-10-01T14:56:14Z",
+        "serial": "D34DC3124A1298E1B1799F230BA61CE5EFE12E8",
+        "sha256": "A4:D5:F9:36:7D:FC:5F:65:82:D2:1A:6E:74:4C:54:5B:AC:8F:47:05:CD:96:12:DA:6C:08:DB:06:AF:23:14:FA",
+        "sans": [
+          "ds-e2e.example.local",
+          "ds-e2e-web",
+          "ds-e2e-web.devopssentinel-e2e.svc",
+          "127.0.0.1"
+        ]
+      },
+      "sentinel_row": "devopssentinel-e2e-pki\tSecret/ds-e2e-cert-expired\tds-e2e-expired\tCN=ds-e2e-intermediate\tOct  1 14:56:14 2026 GMT\t-2\tEXPIRED"
+    },
+    {
+      "id": "DS-E2E-053",
+      "domain": "certificates",
+      "title": "Complete multi-DNS and IP SAN parsing",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 0.103,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-053",
+      "subject": "CN=ds-e2e.example.local",
+      "issuer": "CN=ds-e2e-intermediate",
+      "not_before": "2026-10-02T14:56:14Z",
+      "not_after": "2027-04-01T14:56:14Z",
+      "serial": "707E2F80A4B1BCAF7BD6E87ACB49141C2510B72",
+      "sha256": "51:71:7B:B8:F4:E5:B4:DA:A8:85:4C:9B:86:F6:AB:20:F0:85:74:92:9A:34:33:6A:50:55:83:79:F9:1E:13:35",
+      "sans": [
+        "ds-e2e.example.local",
+        "ds-e2e-web",
+        "ds-e2e-web.devopssentinel-e2e.svc",
+        "127.0.0.1"
+      ]
+    },
+    {
+      "id": "DS-E2E-054",
+      "domain": "certificates",
+      "title": "Duplicate leaf fingerprint detection",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 1.251,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-054",
+      "sha256": "51:71:7B:B8:F4:E5:B4:DA:A8:85:4C:9B:86:F6:AB:20:F0:85:74:92:9A:34:33:6A:50:55:83:79:F9:1E:13:35",
+      "sentinel_row": "DUPLICATE SHA256=51:71:7B:B8:F4:E5:B4:DA:A8:85:4C:9B:86:F6:AB:20:F0:85:74:92:9A:34:33:6A:50:55:83:79:F9:1E:13:35 COUNT=3 SECRETS=Secret/ds-e2e-cert-duplicate,Secret/ds-e2e-cert-incomplete,Secret/ds-e2e-cert-valid"
+    },
+    {
+      "id": "DS-E2E-055",
+      "domain": "certificates",
+      "title": "Root/intermediate/leaf trust chain",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 0.951,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-055",
+      "subject": "CN=ds-e2e.example.local",
+      "issuer": "CN=ds-e2e-intermediate",
+      "not_before": "2026-10-02T14:56:14Z",
+      "not_after": "2027-04-01T14:56:14Z",
+      "serial": "707E2F80A4B1BCAF7BD6E87ACB49141C2510B72",
+      "sha256": "51:71:7B:B8:F4:E5:B4:DA:A8:85:4C:9B:86:F6:AB:20:F0:85:74:92:9A:34:33:6A:50:55:83:79:F9:1E:13:35",
+      "sans": [
+        "ds-e2e.example.local",
+        "ds-e2e-web",
+        "ds-e2e-web.devopssentinel-e2e.svc",
+        "127.0.0.1"
+      ]
+    },
+    {
+      "id": "DS-E2E-150",
+      "domain": "certificates",
+      "title": "Omitted intermediate fails trust verification",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 0.9,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-150"
+    },
+    {
+      "id": "DS-E2E-151",
+      "domain": "certificates",
+      "title": "Root self-issuance and intermediate trust",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 1.748,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-151"
+    },
+    {
+      "id": "DS-E2E-152",
+      "domain": "certificates",
+      "title": "Actual Secret volume/env and workload ownership",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 3.645,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-152"
+    },
+    {
+      "id": "DS-E2E-153",
+      "domain": "certificates",
+      "title": "Actual TLS Pod and verified TLS 1.2/1.3",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 2.938,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-153",
+      "subject": "CN=ds-e2e.example.local",
+      "issuer": "CN=ds-e2e-intermediate",
+      "not_before": "2026-10-02T14:56:14Z",
+      "not_after": "2027-04-01T14:56:14Z",
+      "serial": "707E2F80A4B1BCAF7BD6E87ACB49141C2510B72",
+      "sha256": "51:71:7B:B8:F4:E5:B4:DA:A8:85:4C:9B:86:F6:AB:20:F0:85:74:92:9A:34:33:6A:50:55:83:79:F9:1E:13:35",
+      "sans": [
+        "ds-e2e.example.local",
+        "ds-e2e-web",
+        "ds-e2e-web.devopssentinel-e2e.svc",
+        "127.0.0.1"
+      ],
+      "protocol": "TLSv1.3"
+    },
+    {
+      "id": "DS-E2E-154",
+      "domain": "certificates",
+      "title": "TLS endpoint hostname mismatch fails",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 2.991,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-154",
+      "subject": "CN=ds-e2e.example.local",
+      "issuer": "CN=ds-e2e-intermediate",
+      "not_before": "2026-10-02T14:56:14Z",
+      "not_after": "2027-04-01T14:56:14Z",
+      "serial": "707E2F80A4B1BCAF7BD6E87ACB49141C2510B72",
+      "sha256": "51:71:7B:B8:F4:E5:B4:DA:A8:85:4C:9B:86:F6:AB:20:F0:85:74:92:9A:34:33:6A:50:55:83:79:F9:1E:13:35",
+      "sans": [
+        "ds-e2e.example.local",
+        "ds-e2e-web",
+        "ds-e2e-web.devopssentinel-e2e.svc",
+        "127.0.0.1"
+      ],
+      "protocol": "TLSv1.3"
+    },
+    {
+      "id": "DS-E2E-155",
+      "domain": "certificates",
+      "title": "Untrusted CA fails live verification",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 1.986,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-155",
+      "subject": "CN=ds-e2e.example.local",
+      "issuer": "CN=ds-e2e-intermediate",
+      "not_before": "2026-10-02T14:56:14Z",
+      "not_after": "2027-04-01T14:56:14Z",
+      "serial": "707E2F80A4B1BCAF7BD6E87ACB49141C2510B72",
+      "sha256": "51:71:7B:B8:F4:E5:B4:DA:A8:85:4C:9B:86:F6:AB:20:F0:85:74:92:9A:34:33:6A:50:55:83:79:F9:1E:13:35",
+      "sans": [
+        "ds-e2e.example.local",
+        "ds-e2e-web",
+        "ds-e2e-web.devopssentinel-e2e.svc",
+        "127.0.0.1"
+      ],
+      "protocol": "TLSv1.3"
+    },
+    {
+      "id": "DS-E2E-056",
+      "domain": "certificates",
+      "title": "Live TLS fingerprint matches mounted Secret",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 2.105,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-056",
+      "secret_sha256": "51:71:7B:B8:F4:E5:B4:DA:A8:85:4C:9B:86:F6:AB:20:F0:85:74:92:9A:34:33:6A:50:55:83:79:F9:1E:13:35",
+      "live_sha256": "51:71:7B:B8:F4:E5:B4:DA:A8:85:4C:9B:86:F6:AB:20:F0:85:74:92:9A:34:33:6A:50:55:83:79:F9:1E:13:35",
+      "expected": "MATCH"
+    },
+    {
+      "id": "DS-E2E-057",
+      "domain": "certificates",
+      "title": "Different Ingress Secret produces factual mismatch",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 1.499,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-057",
+      "secret_sha256": "10:D0:00:73:D6:D1:EA:3F:F9:55:4C:6B:AD:27:8F:5B:A8:B8:17:B9:49:21:92:41:1E:40:34:29:43:D0:6B:BB",
+      "live_sha256": "51:71:7B:B8:F4:E5:B4:DA:A8:85:4C:9B:86:F6:AB:20:F0:85:74:92:9A:34:33:6A:50:55:83:79:F9:1E:13:35",
+      "expected": "MISMATCH"
+    },
+    {
+      "id": "DS-E2E-058",
+      "domain": "certificates",
+      "title": "Secret rotation refresh and server reload",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 7.833,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-058",
+      "before": {
+        "subject": "CN=ds-e2e.example.local",
+        "issuer": "CN=ds-e2e-intermediate",
+        "not_before": "2026-10-02T14:56:14Z",
+        "not_after": "2027-04-01T14:56:14Z",
+        "serial": "707E2F80A4B1BCAF7BD6E87ACB49141C2510B72",
+        "sha256": "51:71:7B:B8:F4:E5:B4:DA:A8:85:4C:9B:86:F6:AB:20:F0:85:74:92:9A:34:33:6A:50:55:83:79:F9:1E:13:35",
+        "sans": [
+          "ds-e2e.example.local",
+          "ds-e2e-web",
+          "ds-e2e-web.devopssentinel-e2e.svc",
+          "127.0.0.1"
+        ]
+      },
+      "after": {
+        "subject": "CN=ds-e2e.example.local",
+        "issuer": "CN=ds-e2e-intermediate",
+        "not_before": "2026-10-02T14:56:14Z",
+        "not_after": "2027-10-03T14:56:14Z",
+        "serial": "21CA09009517B8E82A2D76D9C973A7B6D2549393",
+        "sha256": "0F:23:BD:B0:BB:A9:F7:05:18:C5:B4:34:CF:4E:1F:4D:91:53:FD:73:DA:91:8A:8E:FD:E9:45:C5:FD:64:D0:60",
+        "sans": [
+          "ds-e2e.example.local",
+          "ds-e2e-web",
+          "ds-e2e-web.devopssentinel-e2e.svc",
+          "127.0.0.1"
+        ]
+      },
+      "reloaded_endpoint": {
+        "secret_sha256": "0F:23:BD:B0:BB:A9:F7:05:18:C5:B4:34:CF:4E:1F:4D:91:53:FD:73:DA:91:8A:8E:FD:E9:45:C5:FD:64:D0:60",
+        "live_sha256": "0F:23:BD:B0:BB:A9:F7:05:18:C5:B4:34:CF:4E:1F:4D:91:53:FD:73:DA:91:8A:8E:FD:E9:45:C5:FD:64:D0:60",
+        "expected": "MATCH"
+      }
+    },
+    {
+      "id": "DS-E2E-059",
+      "domain": "certificates",
+      "title": "Real cert-manager issuance and CertificateRequest",
+      "status": "BLOCKED",
+      "reason": "cert-manager CRDs are unavailable after prerequisite setup",
+      "duration_seconds": 0.093,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-059"
+    },
+    {
+      "id": "DS-E2E-156",
+      "domain": "certificates",
+      "title": "Real cert-manager missing Issuer failure",
+      "status": "BLOCKED",
+      "reason": "cert-manager CRDs are unavailable after prerequisite setup",
+      "duration_seconds": 0.091,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-156"
+    },
+    {
+      "id": "DS-E2E-157",
+      "domain": "certificates",
+      "title": "Certificate JSON/export and private-key redaction",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 4.613,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-157"
+    },
+    {
+      "id": "DS-E2E-158",
+      "domain": "certificates",
+      "title": "Future certificate validity is explicit",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 0.12,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-158",
+      "certificate": {
+        "subject": "CN=ds-e2e-future",
+        "issuer": "CN=ds-e2e-intermediate",
+        "not_before": "2026-10-05T14:56:14Z",
+        "not_after": "2027-01-01T14:56:14Z",
+        "serial": "5435C084E7D1C4C613BEA1FD00841649A657CC00",
+        "sha256": "9A:78:A2:40:50:27:A1:A0:D3:65:2C:97:60:BB:53:0E:E0:29:6D:76:EA:C8:4E:17:C4:6B:30:94:9C:C2:D7:CB",
+        "sans": [
+          "ds-e2e.example.local",
+          "ds-e2e-web",
+          "ds-e2e-web.devopssentinel-e2e.svc",
+          "127.0.0.1"
+        ]
+      },
+      "sentinel_row": "devopssentinel-e2e-pki\tSecret/ds-e2e-cert-future\tds-e2e-future\tCN=ds-e2e-intermediate\tJan  1 14:56:14 2027 GMT\t89\tNOT_YET_VALID"
+    },
+    {
+      "id": "DS-E2E-060",
+      "domain": "gitops",
+      "title": "Suspended Flux resource",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 6.094,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-060",
+      "expected_kubernetes_state": "spec.suspend=true",
+      "actual_kubernetes_state": true,
+      "expected_sentinel_result": "WARN SUSPENDED",
+      "actual_sentinel_result": "\nKustomization/ds-e2e-suspended [WARN SUSPENDED]\n  Ready=UNKNOWN suspend=true generation=1 observed=-1\n  Created=2026-10-03T14:57:00Z transition=UNKNOWN handledReconcile=UNKNOWN\n  Source=GitRepository/ds-e2e-local-source namespace=devopssentinel-e2e-gitops path=./apps interval=10s\n  Artifact=- applied=- attempted=-\n  Reason=UNKNOWN message=-"
+    },
+    {
+      "id": "DS-E2E-061",
+      "domain": "gitops",
+      "title": "Failed local Git source with message and transition",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 1.432,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-061",
+      "expected_kubernetes_state": "Ready=False with controller fetch error",
+      "actual_kubernetes_state": {
+        "lastTransitionTime": "2026-10-03T14:57:01Z",
+        "message": "failed to checkout and determine revision: unable to clone 'http://ds-e2e-git-server.devopssentinel-e2e-gitops.svc.cluster.local:8080/ds-e2e-does-not-exist.git': repository not found: {\"error\": \"fixture endpoint not found\"}",
+        "observedGeneration": 1,
+        "reason": "GitOperationFailed",
+        "status": "False",
+        "type": "Ready"
+      },
+      "expected_sentinel_result": "Failure reason, message and transition",
+      "actual_sentinel_result": "\nGitRepository/ds-e2e-source-failed [FAIL RECONCILIATION_FAILED]\n  Ready=False suspend=false generation=1 observed=-1\n  Created=2026-10-03T14:57:00Z transition=2026-10-03T14:57:03Z handledReconcile=UNKNOWN\n  URL=http://ds-e2e-git-server.devopssentinel-e2e-gitops.svc.cluster.local:8080/ds-e2e-does-not-exist.git branch/tag=main\n  Artifact=- applied=- attempted=-\n  Reason=GitOperationFailed message=failed to checkout and determine revision: unable to clone 'http://ds-e2e-git-server.devopssentinel-e2e-gitops.svc.cluster.local:8080/ds-e2e-does-not-exist.git': repository not found: {\"error\": \"fixture endpoint not found\"}"
+    },
+    {
+      "id": "DS-E2E-062",
+      "domain": "gitops",
+      "title": "Ready local Git source and exact artifact revision",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 1.326,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-062",
+      "expected_kubernetes_state": "Ready=True generation observed",
+      "actual_kubernetes_state": {
+        "artifact": {
+          "digest": "sha256:e77a705c2bd109a23b5328c72fa941e025e25a639da09f9225024f552e21d5c1",
+          "lastUpdateTime": "2026-10-03T14:57:01Z",
+          "path": "gitrepository/devopssentinel-e2e-gitops/ds-e2e-local-source/75ba23d26f7e234490b8cfad579c931de2f3082b.tar.gz",
+          "revision": "main@sha1:75ba23d26f7e234490b8cfad579c931de2f3082b",
+          "size": 921,
+          "url": "http://source-controller.flux-system.svc.cluster.local./gitrepository/devopssentinel-e2e-gitops/ds-e2e-local-source/75ba23d26f7e234490b8cfad579c931de2f3082b.tar.gz"
+        },
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-10-03T14:57:01Z",
+            "message": "stored artifact for revision 'main@sha1:75ba23d26f7e234490b8cfad579c931de2f3082b'",
+            "observedGeneration": 1,
+            "reason": "Succeeded",
+            "status": "True",
+            "type": "Ready"
+          },
+          {
+            "lastTransitionTime": "2026-10-03T14:57:01Z",
+            "message": "stored artifact for revision 'main@sha1:75ba23d26f7e234490b8cfad579c931de2f3082b'",
+            "observedGeneration": 1,
+            "reason": "Succeeded",
+            "status": "True",
+            "type": "ArtifactInStorage"
+          }
+        ],
+        "observedGeneration": 1
+      },
+      "expected_sentinel_result": "Ready source and exact Git revision",
+      "actual_sentinel_result": "\nGitRepository/ds-e2e-local-source [OK NO_DRIFT_EVIDENCE]\n  Ready=True suspend=false generation=1 observed=1\n  Created=2026-10-03T14:57:00Z transition=2026-10-03T14:57:01Z handledReconcile=UNKNOWN\n  URL=http://ds-e2e-git-server.devopssentinel-e2e-gitops.svc.cluster.local:8080/fixture.git branch/tag=main\n  Artifact=main@sha1:75ba23d26f7e234490b8cfad579c931de2f3082b applied=- attempted=-\n  Reason=Succeeded message=stored artifact for revision 'main@sha1:75ba23d26f7e234490b8cfad579c931de2f3082b'"
+    },
+    {
+      "id": "DS-E2E-063",
+      "domain": "gitops",
+      "title": "Local Git Kustomization deploys a real workload",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 7.634,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-063",
+      "expected_kubernetes_state": "Kustomization Ready=True; Git deployment available=1",
+      "actual_kubernetes_state": {
+        "revision": "main@sha1:75ba23d26f7e234490b8cfad579c931de2f3082b",
+        "available": 1
+      },
+      "expected_sentinel_result": "Ready Kustomization and applied revision",
+      "actual_sentinel_result": "\nKustomization/ds-e2e-ready [OK NO_DRIFT_EVIDENCE]\n  Ready=True suspend=false generation=1 observed=1\n  Created=2026-10-03T14:57:00Z transition=2026-10-03T14:57:11Z handledReconcile=UNKNOWN\n  Source=GitRepository/ds-e2e-local-source namespace=devopssentinel-e2e-gitops path=./apps interval=10s\n  Artifact=- applied=main@sha1:75ba23d26f7e234490b8cfad579c931de2f3082b attempted=main@sha1:75ba23d26f7e234490b8cfad579c931de2f3082b\n  Reason=ReconciliationSucceeded message=Applied revision: main@sha1:75ba23d26f7e234490b8cfad579c931de2f3082b"
+    },
+    {
+      "id": "DS-E2E-064",
+      "domain": "gitops",
+      "title": "Failed Kustomization from missing path",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 1.245,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-064",
+      "expected_kubernetes_state": "Ready=False from missing repository path",
+      "actual_kubernetes_state": {
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-10-03T14:57:11Z",
+            "message": "Fetching manifests for revision main@sha1:75ba23d26f7e234490b8cfad579c931de2f3082b with a timeout of 1m0s",
+            "observedGeneration": 1,
+            "reason": "ProgressingWithRetry",
+            "status": "True",
+            "type": "Reconciling"
+          },
+          {
+            "lastTransitionTime": "2026-10-03T14:57:11Z",
+            "message": "kustomization path not found: stat /tmp/kustomization-1435285699/ds-e2e-nonexistent-path: no such file or directory",
+            "observedGeneration": 1,
+            "reason": "ArtifactFailed",
+            "status": "False",
+            "type": "Ready"
+          }
+        ],
+        "observedGeneration": -1
+      },
+      "expected_sentinel_result": "Reconciliation failure with path",
+      "actual_sentinel_result": "\nKustomization/ds-e2e-kustomization-failed [FAIL RECONCILIATION_FAILED]\n  Ready=False suspend=false generation=1 observed=-1\n  Created=2026-10-03T14:57:00Z transition=2026-10-03T14:57:11Z handledReconcile=UNKNOWN\n  Source=GitRepository/ds-e2e-local-source namespace=devopssentinel-e2e-gitops path=./ds-e2e-nonexistent-path interval=10s\n  Artifact=- applied=- attempted=-\n  Reason=ArtifactFailed message=kustomization path not found: stat /tmp/kustomization-1435285699/ds-e2e-nonexistent-path: no such file or directory"
+    },
+    {
+      "id": "DS-E2E-065",
+      "domain": "gitops",
+      "title": "Local Helm chart installs real Deployment and Service",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 1.593,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-065",
+      "expected_kubernetes_state": "HelmRelease Ready=True with actual installed deployment and Service",
+      "actual_kubernetes_state": {
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-10-03T14:57:07Z",
+            "message": "Helm install succeeded for release devopssentinel-e2e-gitops/ds-e2e-chart-app.v1 with chart ds-e2e-chart@0.1.0",
+            "observedGeneration": 1,
+            "reason": "InstallSucceeded",
+            "status": "True",
+            "type": "Ready"
+          },
+          {
+            "lastTransitionTime": "2026-10-03T14:57:07Z",
+            "message": "Helm install succeeded for release devopssentinel-e2e-gitops/ds-e2e-chart-app.v1 with chart ds-e2e-chart@0.1.0",
+            "observedGeneration": 1,
+            "reason": "InstallSucceeded",
+            "status": "True",
+            "type": "Released"
+          }
+        ],
+        "helmChart": "devopssentinel-e2e-gitops/devopssentinel-e2e-gitops-ds-e2e-chart-app",
+        "history": [
+          {
+            "action": "install",
+            "apiVersion": "v2",
+            "appVersion": "1.0",
+            "chartName": "ds-e2e-chart",
+            "chartVersion": "0.1.0",
+            "configDigest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            "digest": "sha256:64815f52416b244b19af371237275a42ad9ba1102ddbe03b3e32c734ab37ac39",
+            "firstDeployed": "2026-10-03T14:57:02Z",
+            "lastDeployed": "2026-10-03T14:57:02Z",
+            "name": "ds-e2e-chart-app",
+            "namespace": "devopssentinel-e2e-gitops",
+            "status": "deployed",
+            "version": 1
+          }
+        ],
+        "inventory": {
+          "entries": [
+            {
+              "id": "devopssentinel-e2e-gitops_ds-e2e-chart-app__Service",
+              "v": "v1"
+            },
+            {
+              "id": "devopssentinel-e2e-gitops_ds-e2e-chart-app_apps_Deployment",
+              "v": "v1"
+            }
+          ]
+        },
+        "lastAttemptedConfigDigest": "sha256:e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+        "lastAttemptedGeneration": 1,
+        "lastAttemptedReleaseAction": "install",
+        "lastAttemptedReleaseActionDuration": "5.159972765s",
+        "lastAttemptedRevision": "0.1.0",
+        "observedGeneration": 1,
+        "storageNamespace": "devopssentinel-e2e-gitops"
+      },
+      "expected_sentinel_result": "Ready HelmRelease with installed chart version",
+      "actual_sentinel_result": "\nHelmRelease/ds-e2e-chart-app [OK NO_DRIFT_EVIDENCE]\n  Ready=True suspend=false generation=1 observed=1\n  Created=2026-10-03T14:57:01Z transition=2026-10-03T14:57:07Z handledReconcile=UNKNOWN\n  Chart=ds-e2e-chart requestedVersion=0.1.0 installedVersion=0.1.0 releaseRevision=1\n  Artifact=- applied=- attempted=0.1.0\n  Reason=InstallSucceeded message=Helm install succeeded for release devopssentinel-e2e-gitops/ds-e2e-chart-app.v1 with chart ds-e2e-chart@0.1.0"
+    },
+    {
+      "id": "DS-E2E-066",
+      "domain": "gitops",
+      "title": "Actual Helm template failure",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 1.371,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-066",
+      "expected_kubernetes_state": "Ready=False from actual Helm template failure",
+      "actual_kubernetes_state": {
+        "conditions": [
+          {
+            "lastTransitionTime": "2026-10-03T14:57:14Z",
+            "message": "Running 'install' action with timeout of 30s",
+            "observedGeneration": 1,
+            "reason": "Progressing",
+            "status": "True",
+            "type": "Reconciling"
+          },
+          {
+            "lastTransitionTime": "2026-10-03T14:57:14Z",
+            "message": "Helm install failed for release devopssentinel-e2e-gitops/ds-e2e-helm-failed with chart ds-e2e-chart@0.1.0: execution error at (ds-e2e-chart/templates/deployment.yaml:1:24): intentional ds-e2e Helm validation failure",
+            "observedGeneration": 1,
+            "reason": "InstallFailed",
+            "status": "False",
+            "type": "Ready"
+          },
+          {
+            "lastTransitionTime": "2026-10-03T14:57:02Z",
+            "message": "Helm install failed for release devopssentinel-e2e-gitops/ds-e2e-helm-failed with chart ds-e2e-chart@0.1.0: execution error at (ds-e2e-chart/templates/deployment.yaml:1:24): intentional ds-e2e Helm validation failure",
+            "observedGeneration": 1,
+            "reason": "InstallFailed",
+            "status": "False",
+            "type": "Released"
+          }
+        ],
+        "failures": 5,
+        "helmChart": "devopssentinel-e2e-gitops/devopssentinel-e2e-gitops-ds-e2e-helm-failed",
+        "lastAttemptedConfigDigest": "sha256:240da27b14d182e181e3d652308ff8bed27a0e42a353cd02142c064ee419b31a",
+        "lastAttemptedGeneration": 1,
+        "lastAttemptedReleaseAction": "install",
+        "lastAttemptedReleaseActionDuration": "8.147707ms",
+        "lastAttemptedRevision": "0.1.0",
+        "observedGeneration": -1,
+        "storageNamespace": "devopssentinel-e2e-gitops"
+      },
+      "expected_sentinel_result": "Helm failure with controller message",
+      "actual_sentinel_result": "\nHelmRelease/ds-e2e-helm-failed [FAIL HELM_FAILURE]\n  Ready=False suspend=false generation=1 observed=-1\n  Created=2026-10-03T14:57:01Z transition=2026-10-03T14:57:14Z handledReconcile=UNKNOWN\n  Chart=ds-e2e-chart requestedVersion=0.1.0 installedVersion=UNKNOWN releaseRevision=UNKNOWN\n  Artifact=- applied=- attempted=0.1.0\n  Reason=InstallFailed message=Helm install failed for release devopssentinel-e2e-gitops/ds-e2e-helm-failed with chart ds-e2e-chart@0.1.0: execution error at (ds-e2e-chart/templates/deployment.yaml:1:24): intentional ds-e2e Helm validation failure"
+    },
+    {
+      "id": "DS-E2E-067",
+      "domain": "gitops",
+      "title": "GitOps source, inventory and Helm dependency graph",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 1.298,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-067",
+      "expected_kubernetes_state": "Explicit sourceRef and Flux inventory connect source, Kustomization and HelmRelease",
+      "actual_kubernetes_state": [
+        {
+          "id": "devopssentinel-e2e-gitops_ds-e2e-git-app_apps_Deployment",
+          "v": "v1"
+        },
+        {
+          "id": "devopssentinel-e2e-gitops_ds-e2e-chart-app_helm.toolkit.fluxcd.io_HelmRelease",
+          "v": "v2"
+        }
+      ],
+      "expected_sentinel_result": "Complete GitOps dependency graph",
+      "actual_sentinel_result": "GITOPS DEPENDENCY GRAPH | namespace=devopssentinel-e2e-gitops\nGitRepository/ds-e2e-local-source revision=main@sha1:75ba23d26f7e234490b8cfad579c931de2f3082b\n\u251c\u2500\u2500 Kustomization/ds-e2e-kustomization-failed ready=False applied=UNKNOWN\n\u251c\u2500\u2500 Kustomization/ds-e2e-ready ready=True applied=main@sha1:75ba23d26f7e234490b8cfad579c931de2f3082b\n\u2502   \u2514\u2500\u2500 HelmRelease/ds-e2e-chart-app\n\u251c\u2500\u2500 Kustomization/ds-e2e-suspended ready=UNKNOWN applied=UNKNOWN\nGitRepository/ds-e2e-source-failed revision=UNKNOWN\n\nHELM RELEASE SOURCES\nHelmRelease/ds-e2e-chart-app chart=ds-e2e-chart source=HelmRepository/ds-e2e-local-chart ready=True\nHelmRelease/ds-e2e-helm-failed chart=ds-e2e-chart source=HelmRepository/ds-e2e-local-chart ready=False\n\nConfidence: CONFIRMED where Flux sourceRef/status.inventory explicitly links objects; otherwise UNKNOWN.\n"
+    },
+    {
+      "id": "DS-E2E-068",
+      "domain": "gitops",
+      "title": "Second local commit, revision gap and recovery",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 12.043,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-068",
+      "expected_kubernetes_state": "New local commit fetched, temporarily unapplied while suspended, then successfully applied",
+      "actual_kubernetes_state": {
+        "old_revision": "main@sha1:75ba23d26f7e234490b8cfad579c931de2f3082b",
+        "new_revision": "main@sha1:77e31851901ff168872b2ceb3da552aa4f5b32a0",
+        "applied_revision": "main@sha1:77e31851901ff168872b2ceb3da552aa4f5b32a0",
+        "workload_revision": "2"
+      },
+      "expected_sentinel_result": "Observed revision difference followed by revision matches",
+      "actual_sentinel_result": "GITOPS / FLUX | context=vcluster-docker_dev namespace=devopssentinel-e2e-gitops\nSOURCE Kubernetes Flux APIs; TTL 15s. Readiness and revision evidence; desired manifests are not diffed.\n\ngitrepositories | status=OK | cache age=0s\nTOTAL 2 | READY 1 | SUSPENDED 0 | FAILED 1\n\nGitRepository/ds-e2e-local-source [OK NO_DRIFT_EVIDENCE]\n  Ready=True suspend=false generation=1 observed=1\n  Created=2026-10-03T14:57:00Z transition=2026-10-03T14:57:21Z handledReconcile=UNKNOWN\n  URL=http://ds-e2e-git-server.devopssentinel-e2e-gitops.svc.cluster.local:8080/fixture.git branch/tag=main\n  Artifact=main@sha1:77e31851901ff168872b2ceb3da552aa4f5b32a0 applied=- attempted=-\n  Reason=Succeeded message=stored artifact for revision 'main@sha1:77e31851901ff168872b2ceb3da552aa4f5b32a0'\n\nGitRepository/ds-e2e-source-failed [FAIL RECONCILIATION_FAILED]\n  Ready=False suspend=false generation=1 observed=-1\n  Created=2026-10-03T14:57:00Z transition=2026-10-03T14:57:24Z handledReconcile=UNKNOWN\n  URL=http://ds-e2e-git-server.devopssentinel-e2e-gitops.svc.cluster.local:8080/ds-e2e-does-not-exist.git branch/tag=main\n  Artifact=- applied=- attempted=-\n  Reason=GitOperationFailed message=failed to checkout and determine revision: unable to clone 'http://ds-e2e-git-server.devopssentinel-e2e-gitops.svc.cluster.local:8080/ds-e2e-does-not-exist.git': repository not found: {\"error\": \"fixture endpoint not found\"}\n\nkustomizations | status=OK | cache age=0s\nTOTAL 3 | READY 1 | SUSPENDED 1 | FAILED 1\n\nKustomization/ds-e2e-kustomization-failed [FAIL RECONCILIATION_FAILED]\n  Ready=False suspend=false generation=1 observed=-1\n  Created=2026-10-03T14:57:00Z transition=2026-10-03T14:57:21Z handledReconcile=UNKNOWN\n  Source=GitRepository/ds-e2e-local-source namespace=devopssentinel-e2e-gitops path=./ds-e2e-nonexistent-path interval=10s\n  Artifact=- applied=- attempted=-\n  Reason=ArtifactFailed message=kustomization path not found: stat /tmp/kustomization-3615303283/ds-e2e-nonexistent-path: no such file or directory\n\nKustomization/ds-e2e-ready [OK NO_DRIFT_EVIDENCE]\n  Ready=True suspend=false generation=3 observed=3\n  Created=2026-10-03T14:57:00Z transition=2026-10-03T14:57:28Z handledReconcile=UNKNOWN\n  Source=GitRepository/ds-e2e-local-source namespace=devopssentinel-e2e-gitops path=./apps interval=10s\n  Artifact=- applied=main@sha1:77e31851901ff168872b2ceb3da552aa4f5b32a0 attempted=main@sha1:77e31851901ff168872b2ceb3da552aa4f5b32a0\n  Reason=ReconciliationSucceeded message=Applied revision: main@sha1:77e31851901ff168872b2ceb3da552aa4f5b32a0\n\nKustomization/ds-e2e-suspended [WARN SUSPENDED]\n  Ready=UNKNOWN suspend=true generation=1 observed=-1\n  Created=2026-10-03T14:57:00Z transition=UNKNOWN handledReconcile=UNKNOWN\n  Source=GitRepository/ds-e2e-local-source namespace=devopssentinel-e2e-gitops path=./apps interval=10s\n  Artifact=- applied=- attempted=-\n  Reason=UNKNOWN message=-\n\nhelmrepositories | status=OK | cache age=0s\nTOTAL 1 | READY 1 | SUSPENDED 0 | FAILED 0\n\nHelmRepository/ds-e2e-local-chart [OK NO_DRIFT_EVIDENCE]\n  Ready=True suspend=false generation=1 observed=1\n  Created=2026-10-03T14:56:59Z transition=2026-10-03T14:57:00Z handledReconcile=UNKNOWN\n  URL=http://ds-e2e-git-server.devopssentinel-e2e-gitops.svc.cluster.local:8080/charts branch/tag=default\n  Artifact=sha256:eec2edf42191b9976305a51add8901a0425ec41a07b02962314f3228f0a02cb8 applied=- attempted=-\n  Reason=Succeeded message=stored artifact: revision 'sha256:eec2edf42191b9976305a51add8901a0425ec41a07b02962314f3228f0a02cb8'\n\nhelmreleases | status=OK | cache age=0s\nTOTAL 2 | READY 1 | SUSPENDED 0 | FAILED 1\n\nHelmRelease/ds-e2e-chart-app [OK NO_DRIFT_EVIDENCE]\n  Ready=True suspend=false generation=1 observed=1\n  Created=2026-10-03T14:57:01Z transition=2026-10-03T14:57:07Z handledReconcile=UNKNOWN\n  Chart=ds-e2e-chart requestedVersion=0.1.0 installedVersion=0.1.0 releaseRevision=1\n  Artifact=- applied=- attempted=0.1.0\n  Reason=InstallSucceeded message=Helm install succeeded for release devopssentinel-e2e-gitops/ds-e2e-chart-app.v1 with chart ds-e2e-chart@0.1.0\n\nHelmRelease/ds-e2e-helm-failed [FAIL HELM_FAILURE]\n  Ready=False suspend=false generation=1 observed=-1\n  Created=2026-10-03T14:57:01Z transition=2026-10-03T14:57:26Z handledReconcile=UNKNOWN\n  Chart=ds-e2e-chart requestedVersion=0.1.0 installedVersion=UNKNOWN releaseRevision=UNKNOWN\n  Artifact=- applied=- attempted=0.1.0\n  Reason=InstallFailed message=Helm install failed for release devopssentinel-e2e-gitops/ds-e2e-helm-failed with chart ds-e2e-chart@0.1.0: execution error at (ds-e2e-chart/templates/deployment.yaml:1:24): intentional ds-e2e Helm validation failure\n\nSOURCE / APPLIED REVISION COMPARISON (namespace-local observed relationships)\nKustomization/ds-e2e-kustomization-failed -> GitRepository/ds-e2e-local-source: UNKNOWN (revision unavailable)\nKustomization/ds-e2e-ready -> GitRepository/ds-e2e-local-source: NO_DRIFT_EVIDENCE (revision matches)\nKustomization/ds-e2e-suspended -> GitRepository/ds-e2e-local-source: UNKNOWN (revision unavailable)\n"
+    },
+    {
+      "id": "DS-E2E-069",
+      "domain": "gitops",
+      "title": "Workload owner and exact Git revision mapping",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 2.012,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-069",
+      "expected_kubernetes_state": "Pod -> ReplicaSet -> Deployment -> Helm release -> Kustomization -> Git revision",
+      "actual_kubernetes_state": {
+        "pod_names": [
+          "ds-e2e-chart-app-66bcdd778c-97bmq"
+        ],
+        "deployment_uid": "30b4c915-ceba-48a4-adb5-5cf77105fc15",
+        "revision": "main@sha1:77e31851901ff168872b2ceb3da552aa4f5b32a0"
+      },
+      "expected_sentinel_result": "Exact workload ownership and Git revision correlation",
+      "actual_sentinel_result": "DEPLOYMENT VALIDATION | namespace=devopssentinel-e2e-gitops | SOURCE cached API metadata/status\n\nPod/ds-e2e-chart-app-66bcdd778c-97bmq -> ReplicaSet/ds-e2e-chart-app-66bcdd778c -> Deployment/ds-e2e-chart-app\n  Workload desired=1 available=1 generation=1 observed=1\n  HelmRelease=ds-e2e-chart-app releaseLabel=ds-e2e-chart-app\n  Kustomization=ds-e2e-ready source=GitRepository/ds-e2e-local-source applied=main@sha1:77e31851901ff168872b2ceb3da552aa4f5b32a0\n  Container/web declared=ds-e2e-tools:local runtime=sha256:98929c37306d1e5fb66b32f91e223edeeb18411a9b7f6e5d0ae5221585aa8eb0 ready=true\n    Image evidence: MUTABLE_TAG / DRIFT_NOT_VERIFIABLE (tag-to-digest desired mapping unavailable)\n\nRelationships use owner references and controller/release labels. Labels alone do not prove desired-state equality.\n"
+    },
+    {
+      "id": "DS-E2E-079",
+      "domain": "database",
+      "title": "PostgreSQL Service, endpoint and port discovery",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 7.375,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-079",
+      "fixture": "Pod/ds-e2e-postgres, Service/ds-e2e-postgres",
+      "kubernetes_truth": {
+        "ready_endpoints": [
+          "10.244.0.40"
+        ],
+        "port": 5432
+      },
+      "expected": "Sentinel reports the real Service, port, and ready endpoint",
+      "actual": "Service and ready endpoint match Kubernetes",
+      "evidence": "database/postgres-discovery.txt"
+    },
+    {
+      "id": "DS-E2E-080",
+      "domain": "database",
+      "title": "PostgreSQL real read-only SELECTs and credential lifecycle",
+      "status": "BLOCKED",
+      "reason": "PostgreSQL integration requires the tools container to reach the kubectl port-forward on 127.0.0.1:33919. Docker Desktop isolates container networking from the WSL host, so `docker run --network host` cannot reach a port-forward created in the Ubuntu distro. Next action: run this domain from a WSL-native shell without Docker Desktop network isolation, or use an in-cluster client pod. Environment limit, not a DevOpsSentinel defect.",
+      "duration_seconds": 0.662,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-080"
+    },
+    {
+      "id": "DS-E2E-081",
+      "domain": "database",
+      "title": "PostgreSQL wrong password, invalid database and unreachable service",
+      "status": "BLOCKED",
+      "reason": "PostgreSQL integration requires the tools container to reach the kubectl port-forward on 127.0.0.1:53969. Docker Desktop isolates container networking from the WSL host, so `docker run --network host` cannot reach a port-forward created in the Ubuntu distro. Next action: run this domain from a WSL-native shell without Docker Desktop network isolation, or use an in-cluster client pod. Environment limit, not a DevOpsSentinel defect.",
+      "duration_seconds": 0.629,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-081"
+    },
+    {
+      "id": "DS-E2E-082",
+      "domain": "database",
+      "title": "PostgreSQL schema, row count and audit query capability",
+      "status": "BLOCKED",
+      "reason": "Schema discovery, table row count and audit query are not exposed by the four-option PostgreSQL menu (identity, sizes, activity, long-running); the real fixture confirms public.e2e_audit exists with 3 rows. Next action: add a schema/row-count read-only query option to the Sentinel PostgreSQL engine, then rerun --domain database. This product capability gap is not counted as a pass.",
+      "duration_seconds": 0.497,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-082"
+    },
+    {
+      "id": "DS-E2E-083",
+      "domain": "database",
+      "title": "Kafka real broker, messages, topic and consumer group reports",
+      "status": "BLOCKED",
+      "reason": "In-pod Sentinel Kafka run exited 139 (SIGSEGV). The apache/kafka:3.9.1 CLI JVM did not complete inside the disposable WSL fixture. Next action: raise the fixture heap/memory or run against a WSL-native Kafka. Environment/resource limit, not a DevOpsSentinel defect.",
+      "duration_seconds": 23.459,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-083"
+    },
+    {
+      "id": "DS-E2E-084",
+      "domain": "database",
+      "title": "Kafka consumer lag support",
+      "status": "NOT_APPLICABLE",
+      "reason": "Consumer lag is conditional on product support in the request. Sentinel exposes connectivity, topic listing and group listing, but has no lag-report operation; real broker group/offset truth is retained in database/kafka-setup.txt.",
+      "duration_seconds": 0.099,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-084"
+    },
+    {
+      "id": "DS-E2E-090",
+      "domain": "experience",
+      "title": "TXT/CSV/JSON/NDJSON exports of a live report",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 1.86,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-090",
+      "expected_kubernetes_state": "Live pod inventory exported as TXT/CSV/JSON/NDJSON",
+      "actual_kubernetes_state": {
+        "pods": 22,
+        "txt_lines": 34
+      },
+      "expected_sentinel_result": "four private, redacted, schema-valid exports matching live data",
+      "actual_sentinel_result": "four private, redacted, schema-valid exports matching live data"
+    },
+    {
+      "id": "DS-E2E-091",
+      "domain": "experience",
+      "title": "Machine JSON schema and no-ANSI output",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 5.701,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-091",
+      "expected_kubernetes_state": "--snapshot --json",
+      "actual_kubernetes_state": {
+        "schema_version": "1.0",
+        "lines": 73,
+        "exit": 0
+      },
+      "expected_sentinel_result": "deterministic schema, valid JSON, no ANSI",
+      "actual_sentinel_result": "deterministic schema, valid JSON, no ANSI"
+    },
+    {
+      "id": "DS-E2E-092",
+      "domain": "experience",
+      "title": "NO_COLOR and --no-color produce zero ANSI",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 3.388,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-092",
+      "expected_kubernetes_state": "NO_COLOR=1 and --no-color",
+      "actual_kubernetes_state": {
+        "bytes": 4285
+      },
+      "expected_sentinel_result": "zero ANSI escape sequences; text remains readable",
+      "actual_sentinel_result": "zero ANSI escape sequences; text remains readable"
+    },
+    {
+      "id": "DS-E2E-093",
+      "domain": "experience",
+      "title": "Sentinel inventory equals Kubernetes API",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 1.67,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-093",
+      "expected_kubernetes_state": "Sentinel pod inventory equals Kubernetes API",
+      "actual_kubernetes_state": {
+        "api_pods": 22
+      },
+      "expected_sentinel_result": "every live pod name present",
+      "actual_sentinel_result": "every live pod name present"
+    },
+    {
+      "id": "DS-E2E-094",
+      "domain": "experience",
+      "title": "Dashboard renders at 80/100/120/160 columns",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 2.197,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-094",
+      "expected_kubernetes_state": "dashboard_report at 80/100/120/160 columns",
+      "actual_kubernetes_state": {
+        "80": {
+          "lines": 24,
+          "max": 63
+        },
+        "100": {
+          "lines": 29,
+          "max": 79
+        },
+        "120": {
+          "lines": 28,
+          "max": 114
+        },
+        "160": {
+          "lines": 28,
+          "max": 114
+        }
+      },
+      "expected_sentinel_result": "no line exceeds the terminal width",
+      "actual_sentinel_result": "no line exceeds the terminal width"
+    },
+    {
+      "id": "DS-E2E-095",
+      "domain": "experience",
+      "title": "Unicode and ASCII glyph modes",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 1.229,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-095",
+      "expected_kubernetes_state": "DEVOPSSENTINEL_UNICODE on/off",
+      "actual_kubernetes_state": {
+        "ascii": "MID=|--",
+        "unicode": "MID=\u251c\u2500"
+      },
+      "expected_sentinel_result": "glyph set switches; graph stays readable",
+      "actual_sentinel_result": "glyph set switches; graph stays readable"
+    },
+    {
+      "id": "DS-E2E-096",
+      "domain": "experience",
+      "title": "Read-only guard blocks mutation verbs",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 0.773,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-096",
+      "expected_kubernetes_state": "Live ds-e2e-healthy pod remains after blocked mutations",
+      "actual_kubernetes_state": {
+        "guard_exits": {
+          "TOKEN": "2",
+          "RAW": "2",
+          "DELETE": "2",
+          "APPLY": "2",
+          "PATCH": "2"
+        },
+        "pod_uid": "0bfec95e-bfd2-4f22-b3df-46b8becc977c"
+      },
+      "expected_sentinel_result": "scope overrides and mutation verbs rejected before reaching the API",
+      "actual_sentinel_result": "scope overrides and mutation verbs rejected before reaching the API"
+    },
+    {
+      "id": "DS-E2E-097",
+      "domain": "experience",
+      "title": "Global search across resource types",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 21.119,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-097",
+      "expected_kubernetes_state": "Real transformer Deployment/Service/ConfigMap/Secret exist",
+      "actual_kubernetes_state": {
+        "types": [
+          "ConfigMap",
+          "Deployment",
+          "Pod",
+          "ReplicaSet",
+          "Secret",
+          "Service"
+        ],
+        "rows": 6
+      },
+      "expected_sentinel_result": "global search returns every matching resource type",
+      "actual_sentinel_result": "global search returns every matching resource type"
+    },
+    {
+      "id": "DS-E2E-098",
+      "domain": "experience",
+      "title": "Regex and case-insensitive search filter",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 3.563,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-098",
+      "expected_kubernetes_state": "Regex /^Secret and case-insensitive transformer",
+      "actual_kubernetes_state": {
+        "regex": 3,
+        "upper": 6,
+        "lower": 6
+      },
+      "expected_sentinel_result": "regex restricts type; case-insensitive match is stable",
+      "actual_sentinel_result": "regex restricts type; case-insensitive match is stable"
+    },
+    {
+      "id": "DS-E2E-099",
+      "domain": "experience",
+      "title": "Pagination source with 75 real ConfigMaps",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 3.865,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-099",
+      "expected_kubernetes_state": "75 real ds-e2e-page-* ConfigMaps exist in the namespace",
+      "actual_kubernetes_state": {
+        "indexed": 75,
+        "page_size": 20
+      },
+      "expected_sentinel_result": "index holds all rows; page size forces multiple pages",
+      "actual_sentinel_result": "index holds all rows; page size forces multiple pages"
+    },
+    {
+      "id": "DS-E2E-100",
+      "domain": "experience",
+      "title": "Cache LIVE to CACHE to force refresh",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 1.214,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-100",
+      "expected_kubernetes_state": "cache_fresh lifecycle on live pods",
+      "actual_kubernetes_state": {
+        "BEFORE": "1",
+        "AFTER": "0",
+        "FORCED": "1"
+      },
+      "expected_sentinel_result": "first request LIVE, second CACHE, force refresh LIVE",
+      "actual_sentinel_result": "first request LIVE, second CACHE, force refresh LIVE"
+    },
+    {
+      "id": "DS-E2E-101",
+      "domain": "experience",
+      "title": "Triage identifies real fixture failures",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 5.578,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-101",
+      "expected_kubernetes_state": "Real CrashLoopBackOff and ImagePullBackOff fixtures",
+      "actual_kubernetes_state": {
+        "exit": 1
+      },
+      "expected_sentinel_result": "triage surfaces the live failure reasons",
+      "actual_sentinel_result": "triage surfaces the live failure reasons"
+    },
+    {
+      "id": "DS-E2E-102",
+      "domain": "experience",
+      "title": "Forward and reverse dependency mapping",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 6.048,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-102",
+      "expected_kubernetes_state": "Deployment<->Service/ConfigMap graph",
+      "actual_kubernetes_state": {
+        "forward": true,
+        "reverse": true
+      },
+      "expected_sentinel_result": "both directions resolve against live objects",
+      "actual_sentinel_result": "both directions resolve against live objects"
+    },
+    {
+      "id": "DS-E2E-103",
+      "domain": "experience",
+      "title": "Doctor reports real tool availability",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 0.695,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-103",
+      "expected_kubernetes_state": "Live host tooling inventory",
+      "actual_kubernetes_state": {
+        "exit": 0
+      },
+      "expected_sentinel_result": "kubectl AVAILABLE and psql NOT INSTALLED reflect reality",
+      "actual_sentinel_result": "kubectl AVAILABLE and psql NOT INSTALLED reflect reality"
+    },
+    {
+      "id": "DS-E2E-104",
+      "domain": "experience",
+      "title": "Performance report measures live collectors",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 4.076,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-104",
+      "expected_kubernetes_state": "--performance collectors",
+      "actual_kubernetes_state": {
+        "exit": 0
+      },
+      "expected_sentinel_result": "real measured collector durations, no fabricated values",
+      "actual_sentinel_result": "real measured collector durations, no fabricated values"
+    },
+    {
+      "id": "DS-E2E-105",
+      "domain": "experience",
+      "title": "Evidence bundle with checksums and redaction",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 7.233,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-105",
+      "expected_kubernetes_state": "Real evidence bundle for namespace devopssentinel-e2e",
+      "actual_kubernetes_state": {
+        "bundle": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/runtime/evidence/20261003T145909Z_devopssentinel-e2e_DS-E2E-EVID",
+        "files": 13
+      },
+      "expected_sentinel_result": "manifest, findings, checksums present; no secret or key leakage",
+      "actual_sentinel_result": "manifest, findings, checksums present; no secret or key leakage"
+    },
+    {
+      "id": "DS-E2E-106",
+      "domain": "experience",
+      "title": "Global canary and private-key leak scan",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 0.023,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-106",
+      "expected_kubernetes_state": "Recursive scan of every Sentinel-generated artifact",
+      "actual_kubernetes_state": {
+        "files": 260
+      },
+      "expected_sentinel_result": "zero canary or private-key occurrences",
+      "actual_sentinel_result": "zero canary or private-key occurrences"
+    },
+    {
+      "id": "DS-E2E-107",
+      "domain": "experience",
+      "title": "Near-limit long name renders within width",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 0.709,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-107",
+      "expected_kubernetes_state": "Real 207-character ConfigMap name",
+      "actual_kubernetes_state": {
+        "rendered_width": 72
+      },
+      "expected_sentinel_result": "renderer clips within width without border corruption",
+      "actual_sentinel_result": "renderer clips within width without border corruption"
+    },
+    {
+      "id": "DS-E2E-108",
+      "domain": "experience",
+      "title": "Incident session local evidence path",
+      "status": "PASS",
+      "reason": "",
+      "duration_seconds": 7.211,
+      "evidence_path": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/DS-E2E-108",
+      "expected_kubernetes_state": "Local incident session DS-E2E-INC001",
+      "actual_kubernetes_state": {
+        "session": "/home/dheer/.devopssentinel/real-e2e/20261003T145408Z/runtime/evidence/DS-E2E-INC001"
+      },
+      "expected_sentinel_result": "incident evidence, exports and notes are associated with the ID",
+      "actual_sentinel_result": "incident evidence, exports and notes are associated with the ID"
+    }
+  ]
+}
