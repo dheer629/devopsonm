@@ -1,0 +1,64 @@
+#!/usr/bin/env bash
+# DevOpsSentinel Web -- optional demo fixtures.
+#
+# Deploys a small, self-contained set of *real* objects so every domain page
+# (Workloads, Pods, Storage, Network, Database, PKI, Kafka, Events) has
+# something to discover. The Sentinel engine itself stays read-only; this script
+# performs the explicitly scoped setup, mirroring devopssentinel-e2e/ fixtures.
+#
+#   scripts/demo-resources.sh up   [NAMESPACE]   # default namespace: default
+#   scripts/demo-resources.sh down [NAMESPACE]
+#
+# Images are pinned to what is already present in the demo vcluster so no
+# registry access is required. Everything carries the label
+# `devopssentinel.io/demo=true` for one-command cleanup.
+set -euo pipefail
+
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+MANIFEST="$SCRIPT_DIR/../deploy/demo/demo.yaml"
+ACTION="${1:-up}"
+NS="${2:-default}"
+LABEL="devopssentinel.io/demo=true"
+
+log() { printf '[demo-resources] %s\n' "$*"; }
+
+command -v kubectl >/dev/null 2>&1 || { printf 'kubectl is required on PATH\n' >&2; exit 3; }
+[[ -f "$MANIFEST" ]] || { printf 'manifest not found: %s\n' "$MANIFEST" >&2; exit 3; }
+
+kubectl get namespace "$NS" >/dev/null 2>&1 || kubectl create namespace "$NS" >/dev/null
+
+if [[ "$ACTION" == "down" ]]; then
+    log "removing demo fixtures from namespace $NS"
+    kubectl delete -n "$NS" -l "$LABEL" \
+        deployment,service,secret,persistentvolumeclaim,configmap \
+        --ignore-not-found >/dev/null || true
+    log "done"
+    exit 0
+fi
+
+[[ "$ACTION" == "up" ]] || { printf 'usage: %s {up|down} [NAMESPACE]\n' "$0" >&2; exit 2; }
+
+log "applying demo fixtures to namespace $NS"
+kubectl apply -n "$NS" -f "$MANIFEST"
+
+# TLS Secret (PKI / TLS page). Generated locally; the private key never leaves
+# the cluster and is never read back by the read-only adapter.
+tmp=$(mktemp -d)
+trap 'rm -rf -- "$tmp"' EXIT
+openssl req -x509 -nodes -newkey rsa:2048 -days 365 \
+    -keyout "$tmp/tls.key" -out "$tmp/tls.crt" \
+    -subj "/CN=demo.sentinel.local/O=DevOpsSentinel Demo" \
+    -addext "subjectAltName=DNS:demo.sentinel.local,DNS:demo-web.$NS.svc" \
+    >/dev/null 2>&1
+kubectl create secret tls demo-tls \
+    --cert="$tmp/tls.crt" --key="$tmp/tls.key" \
+    -n "$NS" --dry-run=client -o yaml | kubectl apply -n "$NS" -f - >/dev/null
+kubectl -n "$NS" label secret demo-tls devopssentinel.io/demo=true --overwrite >/dev/null
+
+log "waiting for demo workloads to become ready"
+kubectl -n "$NS" rollout status deployment/demo-web --timeout=120s || true
+kubectl -n "$NS" rollout status deployment/demo-postgres --timeout=120s || true
+
+log "objects in namespace $NS:"
+kubectl -n "$NS" get deploy,svc,pvc,secret -l "$LABEL" 2>/dev/null || true
+log "done"

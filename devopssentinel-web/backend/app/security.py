@@ -7,6 +7,7 @@ independent guard so a future engine change cannot leak a secret.
 
 from __future__ import annotations
 
+import json
 import re
 
 # Kubernetes DNS-1123 names (contexts allow a few extra characters).
@@ -40,6 +41,44 @@ def _looks_like_json(line: str) -> bool:
     return stripped.startswith("{") or stripped.startswith("[")
 
 
+def _redact_value(value: str) -> str:
+    """Redact a single unstructured string (used for JSON string values)."""
+    value = _URL_CRED.sub(r"\1[REDACTED]@", value)
+    value = _KV_CRED.sub(lambda m: f"{m.group(1)}={REDACTED}", value)
+    value = _BEARER.sub(lambda m: f"{m.group(1)} {REDACTED}", value)
+    value = _JWT.sub(REDACTED, value)
+    value = _KNOWN_PREFIX.sub(REDACTED, value)
+    if _REDACT_LINE.search(value):
+        value = REDACTED
+    return value
+
+
+def _redact_json_document(text: str) -> str | None:
+    """Redact a whole JSON document without breaking its structure.
+
+    The engine's ``--json`` mode is pretty-printed, so a line-at-a-time sweep
+    would replace structural lines (for example a capability string that merely
+    mentions ``TOKEN``) and leave unparseable JSON behind. Parsing first keeps
+    the machine-readable contract intact while still removing credentials.
+    Returns ``None`` when the text is not a single valid JSON document.
+    """
+    try:
+        payload = json.loads(text)
+    except (json.JSONDecodeError, ValueError):
+        return None
+
+    def walk(node: object) -> object:
+        if isinstance(node, str):
+            return _redact_value(node)
+        if isinstance(node, list):
+            return [walk(item) for item in node]
+        if isinstance(node, dict):
+            return {key: walk(value) for key, value in node.items()}
+        return node
+
+    return json.dumps(walk(payload), ensure_ascii=False, indent=2)
+
+
 def redact_text(text: str) -> str:
     """Redact credentials, tokens and private keys from arbitrary text.
 
@@ -48,6 +87,11 @@ def redact_text(text: str) -> str:
     """
     if not text:
         return text
+    stripped = text.lstrip()
+    if stripped.startswith("{") or stripped.startswith("["):
+        redacted = _redact_json_document(text)
+        if redacted is not None:
+            return redacted
     out_lines: list[str] = []
     in_pem = False
     for line in text.splitlines():

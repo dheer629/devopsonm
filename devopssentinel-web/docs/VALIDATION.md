@@ -7,7 +7,7 @@ frontend served from the production `dist/` build.
 
 | Layer | Command | Result |
 | --- | --- | --- |
-| Backend unit + API contract | `python -m pytest -q` | **50 passed** |
+| Backend unit + API contract | `python -m pytest -q` | **64 passed** |
 | Frontend typecheck (strict) | `cd frontend && npm run typecheck` | **clean** |
 | Frontend unit | `cd frontend && npx vitest run` | **18 passed** (4 files) |
 | Frontend production build | `cd frontend && npm run build` | **built** (840 kB JS / 43 kB CSS; 261 kB / 8 kB gzip) |
@@ -76,7 +76,13 @@ Real captured formats that the parsers were aligned to:
 * `--gitops` — `Kind/name [STATUS REASON]` blocks with indented `key=value` lines
 * `--network` — `Service/<name> type=… clusterIP=… ports=…` + `EndpointSlice: … ready=N/M`
 * `--doctor` — column-aligned `tool  STATUS` lines
-* `--certificates` / storage — TAB-separated metadata tables
+* `--storage` — `STORAGE DEPENDENCY GRAPH` tree: `PVC/<name> phase=… requested=… capacity=…` then
+  `├── PV: <pv> class=…` / `└── Pod: <pod> node=…`
+* `--certificates` — `[STATE] <secret> | namespace=… | source=Secret/tls.crt certificate#N |
+  daysLeft=N` block followed by `subject=` / `issuer=` / `notAfter=` lines, plus a
+  `SECRET METADATA` table and a `SECRET MOUNT REFERENCES` table
+* `--postgres-discovery` / `--kafka-discovery` — TAB-separated `SERVICE TYPE …` tables (rendered as
+  report text)
 
 ### Defects found and fixed during live validation
 
@@ -93,6 +99,11 @@ Real captured formats that the parsers were aligned to:
 | Themes had no default palette at first paint (`:root` lost its variables when per-theme classes were added) | axe flagged `color-contrast` on `/workloads` | Midnight is now the `:root` default and `index.html` ships `class="theme-midnight dark"` |
 | Doctor table listed banner lines as capabilities | live doctor output | rows are filtered to known status tokens |
 | Empty GitOps in a non-Flux namespace looked broken | live browser check | explicit hint plus a one-click switch to `flux-system` |
+| Database / Kafka / ETDP pages rendered a **blank white screen** | user report (`/database`) | the hooks typed report data as `string` while the backend returned `{title, lines}`, so `.split()` threw and React unmounted the tree. The backend now returns the report as one string, and the UI tolerates both shapes via `reportText()` |
+| Every domain page reported no data | user report (PVC / PKI empty) | the engine **requires `--namespace` in non-interactive mode** and the UI never picked one, so every invocation exited 2. The top bar now adopts a default namespace automatically, and the envelope surfaces the engine's own stderr reason instead of a generic message |
+| Storage page empty | live capture of `--storage` | the report is a **dependency tree**, not a table; added a tree parser (`PVC/name phase=… requested=… capacity=…` + `PV:` / `Pod:` children) with the table form kept as a fallback |
+| PKI page empty | live capture of `--certificates` | TLS metadata is a **multi-line block** (`[OK] name \| namespace=… \| daysLeft=…` + `subject=` / `issuer=` / `notAfter=`), not a table; added a block parser and derived consumers from `SECRET MOUNT REFERENCES` |
+| `--capabilities` and `--certificates` returned “engine produced no machine-readable output” even though the engine emitted valid JSON | live API probe | backend redaction rewrote whole pretty-printed JSON lines that merely mentioned `TOKEN`, leaving unparseable JSON. Redaction now parses and redacts the JSON document, keeping the structure valid |
 
 ### Environment notes (not application defects)
 

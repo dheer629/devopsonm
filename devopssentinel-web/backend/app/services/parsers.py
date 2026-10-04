@@ -594,8 +594,68 @@ def normalize_services(lines: list[str], namespace: str = "") -> list[Service]:
 # Certificates / storage (tab-separated metadata tables)
 # --------------------------------------------------------------------------
 
+_CERT_BLOCK = re.compile(r"^\[([A-Z_]+)\]\s+(\S+)\s+\|\s+namespace=(\S+)\s+\|")
+_CERT_DAYS = re.compile(r"\bdaysLeft=(-?\d+)")
+_CERT_CN = re.compile(r"CN\s*=\s*([^,]+)")
+
+
+def _cert_status(days: int | None, fallback: str = "") -> str:
+    if days is None:
+        return canonical_severity(fallback)
+    if days < 0 or days <= 7:
+        return "CRITICAL"
+    if days <= 30:
+        return "WARNING"
+    return "OK"
+
+
+def _cert_field(value: str) -> str:
+    match = _CERT_CN.search(value)
+    return (match.group(1) if match else value).strip()
+
+
 def normalize_certificates(lines: list[str], namespace: str = "") -> list[Certificate]:
     certs: list[Certificate] = []
+
+    # Primary format: the engine's `TLS CERTIFICATE METADATA` block, e.g.
+    #   [OK] demo-tls | namespace=default | source=Secret/tls.crt certificate#1 | daysLeft=364
+    #   subject=CN = demo.sentinel.local, O = DevOpsSentinel Demo
+    #   issuer=CN = demo.sentinel.local, O = DevOpsSentinel Demo
+    #   notAfter=Oct  4 03:32:57 2027 GMT
+    current: Certificate | None = None
+
+    def flush() -> None:
+        nonlocal current
+        if current is not None:
+            certs.append(current)
+            current = None
+
+    for raw in lines:
+        stripped = raw.strip()
+        block = _CERT_BLOCK.match(stripped)
+        if block:
+            flush()
+            state, name, ns = block.groups()
+            days_match = _CERT_DAYS.search(stripped)
+            days = int(days_match.group(1)) if days_match else None
+            current = Certificate(
+                name=name,
+                namespace=ns or namespace,
+                days=days,
+                status=_cert_status(days, state),
+            )
+            continue
+        if current is None:
+            continue
+        if stripped.startswith("subject="):
+            current.cn = _cert_field(stripped[len("subject="):])
+        elif stripped.startswith("issuer="):
+            current.issuer = _cert_field(stripped[len("issuer="):])
+        elif stripped.startswith("notAfter="):
+            current.expiry = stripped[len("notAfter="):].strip()
+    flush()
+
+    # Fallback: tab-separated certificate tables (other engine revisions).
     for header, rows in extract_tables(lines):
         low = [h.lower() for h in header]
         if not any(h in low for h in ("certificate", "cn", "expiry", "days", "issuer", "not after")):
@@ -635,11 +695,67 @@ def normalize_certificates(lines: list[str], namespace: str = "") -> list[Certif
                     gitops=_cell(row, header, "gitops", "flux"),
                 )
             )
+    # Consumers: count Secret mount references reported by the engine
+    # (`SECRET MOUNT REFERENCES` table) so PKI rows can show blast radius.
+    mounts: dict[str, int] = {}
+    for header, rows in extract_tables(lines):
+        low = [h.lower() for h in header]
+        if "secret" in low and "pod" in low and any(h in low for h in ("mount path", "volume")):
+            idx = low.index("secret")
+            for row in rows:
+                if idx < len(row) and row[idx].strip():
+                    key = row[idx].strip()
+                    mounts[key] = mounts.get(key, 0) + 1
+    for cert in certs:
+        if cert.name in mounts:
+            cert.consumers = mounts[cert.name]
     return certs
+
+
+_PVC_TREE = re.compile(r"^PVC/(\S+)\s+phase=(\S+)\s+requested=(\S+)\s+capacity=(\S+)")
+_PVC_PV = re.compile(r"\bPV:\s*(\S+)\s+class=(\S+)")
 
 
 def normalize_pvcs(lines: list[str], namespace: str = "") -> list[PVC]:
     pvcs: list[PVC] = []
+
+    # Primary format: the engine's `STORAGE DEPENDENCY GRAPH` tree, e.g.
+    #   PVC/demo-data phase=Bound requested=1Gi capacity=1Gi
+    #   ├── PV: pvc-0f1d... class=local-path reclaim=Delete csi=UNKNOWN
+    #   └── Pod: demo-web-7cf4... node=dev
+    current: PVC | None = None
+
+    def flush() -> None:
+        nonlocal current
+        if current is not None:
+            pvcs.append(current)
+            current = None
+
+    for raw in lines:
+        line = raw.strip()
+        tree = _PVC_TREE.match(line)
+        if tree:
+            flush()
+            name, phase, _requested, capacity = tree.groups()
+            current = PVC(
+                name=name,
+                namespace=namespace,
+                status=phase,
+                capacity=capacity,
+                severity="OK" if phase.lower() == "bound" else "WARNING",
+            )
+            continue
+        if current is not None:
+            pv = _PVC_PV.search(line)
+            if pv:
+                current.volume = pv.group(1)
+                current.storage_class = pv.group(2)
+    flush()
+
+    if pvcs:
+        return pvcs
+
+    # Fallback: tab-separated metadata tables (other engine revisions).
     for header, rows in extract_tables(lines):
         low = [h.lower() for h in header]
         if "name" not in low:

@@ -16,6 +16,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { reportText } from "@/lib/format";
 import { useApp } from "@/state/AppContext";
 
 export function PodDetailPage() {
@@ -69,7 +70,7 @@ export function PodDetailPage() {
             ) : null}
             {pod.data ? (
               <pre className="mono max-h-[420px] overflow-auto whitespace-pre-wrap rounded bg-bg-elevated p-2 text-[11.5px] text-text-muted">
-                {pod.data.envelope.data}
+                {reportText(pod.data.envelope.data)}
               </pre>
             ) : null}
           </CardBody>

@@ -4,6 +4,7 @@ import { useDoctor, useEtDp, useDatabase, useKafka } from "@/api/queries";
 import { ErrorState, Freshness, LoadingRows, PageHeader, RawView } from "@/components/common";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
+import { reportText } from "@/lib/format";
 import { useApp } from "@/state/AppContext";
 
 export type ReportKind = "etdp" | "database" | "kafka" | "health";
@@ -39,7 +40,10 @@ export function ReportPage({ kind }: { kind: ReportKind }) {
   const meta = META[kind];
 
   const lines = useMemo(
-    () => (active.data?.envelope.data ?? "").split("\n").filter((line) => line.trim() !== ""),
+    () =>
+      reportText(active.data?.envelope.data)
+        .split("\n")
+        .filter((line) => line.trim() !== ""),
     [active.data],
   );
 
@@ -76,7 +80,8 @@ export function ReportPage({ kind }: { kind: ReportKind }) {
           ) : null}
           {!active.isLoading && lines.length === 0 && !active.data?.envelope.errors.length ? (
             <p className="p-3 text-[12.5px] text-text-muted">
-              No data was reported for this scope. Optional capability missing or nothing matched.
+              No data was reported for this scope. The engine needs a namespace that contains matching
+              objects — select one in the top bar. Optional capabilities may also be absent.
             </p>
           ) : null}
         </CardBody>

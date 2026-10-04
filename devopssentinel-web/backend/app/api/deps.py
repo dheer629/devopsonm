@@ -115,7 +115,11 @@ async def invoke(
     if payload.get("truncated"):
         warnings.append("output truncated at the configured size limit")
     if engine.get("lines") is None:
-        errors.append("engine produced no machine-readable output")
+        # Surface the engine's own diagnostic (e.g. a required --namespace)
+        # instead of a generic message, so the UI can explain the real cause.
+        stderr = ((payload.get("raw") or {}).get("stderr") or "").strip()
+        reason = stderr.splitlines()[0][:300] if stderr else ""
+        errors.append(reason or "engine produced no machine-readable output")
 
     data: Any
     if normalizer is not None and lines:
@@ -123,7 +127,10 @@ async def invoke(
     elif normalizer is not None:
         data = []
     else:
-        data = {"title": engine.get("title", ""), "lines": lines}
+        # Report modes without a typed normalizer return the engine's own
+        # report text as a single string. The browser renders it verbatim
+        # (never interpreted), so the contract stays ``data: string``.
+        data = "\n".join(lines)
 
     envelope = make_envelope(
         data,

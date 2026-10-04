@@ -4,6 +4,7 @@ import { useDoctor, useSystem } from "@/api/queries";
 import { ErrorState, Freshness, LoadingRows, PageHeader, RawView } from "@/components/common";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
+import { reportText } from "@/lib/format";
 import { useApp } from "@/state/AppContext";
 
 interface Row {
@@ -21,7 +22,7 @@ export function DoctorPage() {
   const system = useSystem();
 
   const rows = useMemo<Row[]>(() => {
-    const lines = (doctor.data?.envelope.data ?? "").split("\n");
+    const lines = reportText(doctor.data?.envelope.data).split("\n");
     const parsed: Row[] = [];
     for (const line of lines) {
       const cells = line.trim().split(/\s{2,}|\t/).filter(Boolean);

@@ -31,3 +31,19 @@ export function truncateId(value: string, max = 28): string {
   if (value.length <= max) return value;
   return `${value.slice(0, max - 1)}…`;
 }
+
+/**
+ * Render an engine report payload as plain text.
+ *
+ * Report operations without a typed normalizer return the engine's report as a
+ * string. Older envelopes (and a few fixtures) wrap it as `{ title, lines }`,
+ * so tolerate both shapes instead of throwing and blanking the page.
+ */
+export function reportText(data: unknown): string {
+  if (typeof data === "string") return data;
+  if (data && typeof data === "object") {
+    const lines = (data as { lines?: unknown }).lines;
+    if (Array.isArray(lines)) return lines.map((line) => String(line)).join("\n");
+  }
+  return "";
+}

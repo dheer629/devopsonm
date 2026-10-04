@@ -1,0 +1,162 @@
+# DevOpsSentinel Web -- demo fixtures.
+#
+# Applied by scripts/demo-resources.sh (namespace supplied on the command line).
+# Everything carries `devopssentinel.io/demo: "true"` for one-command cleanup.
+# Images are pinned to what is already present in the demo vcluster.
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: demo-data
+  labels:
+    devopssentinel.io/demo: "true"
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-web
+  labels:
+    app: demo-web
+    devopssentinel.io/demo: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo-web
+  template:
+    metadata:
+      labels:
+        app: demo-web
+        devopssentinel.io/demo: "true"
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: web
+          image: ghcr.io/stefanprodan/podinfo:6.15.0
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 9898
+          volumeMounts:
+            - name: data
+              mountPath: /data
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: 9898
+            initialDelaySeconds: 3
+            periodSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: demo-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: demo-web
+  labels:
+    app: demo-web
+    devopssentinel.io/demo: "true"
+spec:
+  type: ClusterIP
+  selector:
+    app: demo-web
+  ports:
+    - name: http
+      port: 9898
+      targetPort: 9898
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: demo-postgres
+  labels:
+    devopssentinel.io/demo: "true"
+type: Opaque
+stringData:
+  password: demo-not-a-real-credential
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-postgres
+  labels:
+    app: demo-postgres
+    devopssentinel.io/demo: "true"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: demo-postgres
+  template:
+    metadata:
+      labels:
+        app: demo-postgres
+        devopssentinel.io/demo: "true"
+    spec:
+      automountServiceAccountToken: false
+      containers:
+        - name: postgres
+          image: postgres:16-alpine
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POSTGRES_DB
+              value: demo
+            - name: POSTGRES_USER
+              value: demo
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: demo-postgres
+                  key: password
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "demo"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  labels:
+    app: demo-postgres
+    devopssentinel.io/demo: "true"
+spec:
+  type: ClusterIP
+  selector:
+    app: demo-postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+---
+# Kafka discovery reads Service metadata only (no broker is contacted), so a
+# Service named `kafka` is enough to exercise the Kafka page end to end.
+apiVersion: v1
+kind: Service
+metadata:
+  name: kafka
+  labels:
+    app: demo-postgres
+    devopssentinel.io/demo: "true"
+spec:
+  type: ClusterIP
+  selector:
+    app: demo-postgres
+  ports:
+    - name: kafka
+      port: 9093
+      targetPort: 5432

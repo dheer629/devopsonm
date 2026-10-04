@@ -61,6 +61,31 @@ Requirements: Python 3.11+, Bash 4.4+, `kubectl`, `jq`, and an engine checkout o
 `devopssentinel-web/` (or next to the launcher). No Docker, no sudo, no `/usr/local`, no cluster
 deployment.
 
+## Demo fixtures (optional)
+
+Every domain page is driven by real cluster objects. If a namespace is empty, the corresponding page
+legitimately reports nothing. To exercise **all** pages end to end, deploy the bundled fixtures:
+
+```bash
+scripts/demo-resources.sh up   default     # default namespace is `default`
+scripts/demo-resources.sh down default     # one-command cleanup
+```
+
+This creates a labelled (`devopssentinel.io/demo=true`) set of *real* objects, using only images
+already present in the cluster:
+
+| Page | Fixture |
+| --- | --- |
+| Workloads / Pods / Events / Topology | `Deployment/demo-web` (podinfo) + `Deployment/demo-postgres` |
+| Storage | `PersistentVolumeClaim/demo-data` (bound by the web pod) |
+| Network | `Service/demo-web`, `Service/postgres`, `Service/kafka` with live endpoints |
+| Database | `Service/postgres` → ready endpoint reported by `--postgres-discovery` |
+| Kafka | `Service/kafka` → reported by `--kafka-discovery` |
+| PKI / TLS | `Secret/demo-tls` (`kubernetes.io/tls`, locally generated, 365 days) |
+
+The read-only adapter is unaffected: the script performs the explicitly scoped setup, exactly like the
+`devopssentinel-e2e/` harness.
+
 ## Build
 
 ```bash
@@ -91,7 +116,7 @@ deployment.
 | 7 professional themes (5 dark / 2 light) + system auto, swatch picker, bubble surface language | ✅ |
 | Virtualized tables (5,000-row inventory test), status = icon + text + colour | ✅ |
 | SSE endpoints for live refresh and streamed logs | ✅ |
-| pytest (48), Vitest (18), Playwright smoke + axe (frontend-only, fixture-backed) | ✅ |
+| pytest (64), Vitest (18), Playwright smoke + axe (frontend-only, fixture-backed) | ✅ |
 | Live TLS inspection, interactive logs, DB/Kafka credential prompts | ⛔ CLI only (see parity matrix) |
 
 See **[docs/FEATURE_PARITY_MATRIX.md](docs/FEATURE_PARITY_MATRIX.md)** for the complete

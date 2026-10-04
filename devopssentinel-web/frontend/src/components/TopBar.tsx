@@ -34,6 +34,15 @@ export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
     if (!context && current) setContext(current);
   }, [context, current, setContext]);
 
+  // The engine requires a namespace in non-interactive mode, so adopt a
+  // sensible default (prefer `default`) once the list is available. Without
+  // this every domain page reports "namespace is required" and looks empty.
+  useEffect(() => {
+    if (namespace || namespaceList.length === 0) return;
+    const preferred = namespaceList.includes("default") ? "default" : namespaceList[0];
+    setNamespace(preferred);
+  }, [namespace, namespaceList, setNamespace]);
+
   return (
     <header className="flex flex-wrap items-center gap-2 border-b border-border/80 bg-panel/85 px-3 py-2 backdrop-blur-xl">
       <div className="flex items-center gap-2">

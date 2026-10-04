@@ -64,6 +64,28 @@ def test_graph_and_impact(client):
     assert "referenced_by" in impact["data"] or "direct" in impact["data"]
 
 
+def test_pod_detail_triages_the_owning_workload(client):
+    """``--triage-workload`` correlates workloads, not pods.
+
+    Passing ``Pod/x`` makes the engine answer ``WORKLOAD NOT FOUND`` and exit 2,
+    so the adapter resolves the pod's owner first and triages that.
+    """
+    body = client.get("/api/v1/pods/transformer-abc", params=SCOPE).json()
+    assert "Deployment/transformer" in body["raw"]["engineArgv"]
+    assert "Pod/transformer-abc" not in body["raw"]["engineArgv"]
+
+
+def test_pod_events_endpoint_returns_normalized_rows(client):
+    """Regression: the events normalizer used to be `async def`.
+
+    ``invoke`` calls normalizers synchronously, so an async normalizer leaked a
+    coroutine into the envelope and every request returned HTTP 500.
+    """
+    response = client.get("/api/v1/pods/log-transformer-def/events", params=SCOPE)
+    assert response.status_code == 200
+    assert isinstance(response.json()["envelope"]["data"], list)
+
+
 def test_doctor_capabilities(client):
     env = client.get("/api/v1/doctor", params=SCOPE).json()["envelope"]
     assert env["data"]

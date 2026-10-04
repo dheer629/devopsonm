@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from app.security import (
@@ -42,6 +44,37 @@ def test_redact_private_key_block():
 
 def test_redact_key_value_password():
     assert "hunter2" not in redact_text("password=hunter2")
+
+
+def test_redact_keeps_json_documents_parseable():
+    """Regression: pretty-printed ``--json`` must survive redaction.
+
+    A line-at-a-time sweep used to replace a whole structural line (any line
+    that merely mentioned TOKEN) and leave unparseable JSON behind. The adapter
+    then reported "engine produced no machine-readable output" and the UI showed
+    an empty or blank page.
+    """
+    payload = {
+        "schema_version": "1.0",
+        "lines": [
+            "Splunk\tNOT_CONFIGURED\tset SPLUNK_HEC_TOKEN=abcdef",
+            "cert-manager\tNOT_PROBED",
+            "Authorization: Bearer eyJhbGciOiJIUzI1NiJ9.payload.sig",
+        ],
+    }
+    text = json.dumps(payload, indent=2)
+    out = redact_text(text)
+    parsed = json.loads(out)  # must not raise
+    assert parsed["lines"][1] == "cert-manager\tNOT_PROBED"
+    assert "eyJhbGciOiJIUzI1NiJ9" not in out
+    assert "[REDACTED]" in out
+
+
+def test_redact_still_treats_plain_text_line_wise():
+    text = "kubectl AVAILABLE\nAuthorization: Bearer eyJhbGciOiJIUzI1NiJ9.x.y"
+    out = redact_text(text)
+    assert "kubectl AVAILABLE" in out
+    assert "eyJhbGciOiJIUzI1NiJ9" not in out
 
 
 def test_read_only_guard_blocks_mutation_verbs():

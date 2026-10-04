@@ -290,7 +290,7 @@ def test_secret_metadata_table_is_not_mistaken_for_certificates():
     assert normalize_certificates(lines, "flux-system") == []
 
 
-def test_normalize_pvcs():
+def test_normalize_pvcs() -> None:
     lines = [
         "NAME\tSTATUS\tCAPACITY\tACCESS MODES\tSTORAGECLASS\tVOLUME",
         "data-0\tBound\t10Gi\tRWO\tstandard\tpv-0",
@@ -300,6 +300,84 @@ def test_normalize_pvcs():
     by_name = {p.name: p for p in pvcs}
     assert by_name["data-0"].severity == "OK"
     assert by_name["data-1"].severity == "WARNING"
+
+
+STORAGE_TREE = [
+    "STORAGE DEPENDENCY GRAPH | namespace=algorithm-learn",
+    "PVC/backend-data phase=Bound requested=2Gi capacity=2Gi",
+    "├── PV: pvc-bfe51ed5-6ec4-44d7-819c-c44cbb07d6dc class=local-path reclaim=Delete csi=UNKNOWN",
+    "└── Pod: backend-65cf6b455b-9nps9 node=dev",
+    "PVC/postgres-data phase=Bound requested=1Gi capacity=1Gi",
+    "├── PV: pvc-a9d74f18-e8db-43cf-b632-72628e9e93cc class=local-path reclaim=Delete csi=UNKNOWN",
+    "└── Pod: postgres-64cdc79784-8ggfz node=dev",
+]
+
+
+def test_normalize_pvcs_from_real_storage_tree() -> None:
+    """The engine's `--storage` report is a tree, not a table."""
+    pvcs = normalize_pvcs(STORAGE_TREE, "algorithm-learn")
+    by_name = {p.name: p for p in pvcs}
+    assert len(pvcs) == 2
+    assert by_name["backend-data"].status == "Bound"
+    assert by_name["backend-data"].capacity == "2Gi"
+    assert by_name["backend-data"].storage_class == "local-path"
+    assert by_name["backend-data"].volume.startswith("pvc-bfe51ed5")
+    assert by_name["backend-data"].severity == "OK"
+    assert by_name["postgres-data"].storage_class == "local-path"
+
+
+CERT_BLOCK = [
+    "CERTIFICATES | namespace=default | TTL 60s | WARN <=30d CRITICAL <=7d",
+    "SECRET METADATA | OK | cache age=0s",
+    "NAME\tTYPE\tCREATED\tKEY COUNT\tKEY NAMES",
+    "demo-tls\tkubernetes.io/tls\t2026-10-04T03:31:02Z\t2\ttls.crt tls.key ",
+    "",
+    "TLS CERTIFICATE METADATA | OK | cache age=0s",
+    "[OK] demo-tls | namespace=default | source=Secret/tls.crt certificate#1 | daysLeft=364",
+    "subject=CN = demo.sentinel.local, O = DevOpsSentinel Demo",
+    "issuer=CN = demo.sentinel.local, O = DevOpsSentinel Demo",
+    "serial=79DFF17B771C00EFAC61008E63164C05C0AC43ED",
+    "notBefore=Oct  4 03:32:57 2026 GMT",
+    "notAfter=Oct  4 03:32:57 2027 GMT",
+    "",
+    "DUPLICATE LEAF CERTIFICATES",
+    "No duplicate leaf certificate fingerprints observed",
+]
+
+
+def test_normalize_certificates_from_real_block() -> None:
+    """The engine's TLS metadata is a multi-line block, not a table."""
+    certs = normalize_certificates(CERT_BLOCK, "default")
+    assert len(certs) == 1
+    cert = certs[0]
+    assert cert.name == "demo-tls"
+    assert cert.namespace == "default"
+    assert cert.cn == "demo.sentinel.local"
+    assert cert.issuer == "demo.sentinel.local"
+    assert cert.days == 364
+    assert cert.status == "OK"
+    assert cert.expiry.startswith("Oct  4 03:32:57 2027")
+
+
+def test_normalize_certificates_expired_block_is_critical() -> None:
+    lines = [
+        "[EXPIRED] stale-tls | namespace=default | source=Secret/tls.crt certificate#1 | daysLeft=-3",
+        "subject=CN = stale.local",
+        "notAfter=Jan  1 00:00:00 2025 GMT",
+    ]
+    certs = normalize_certificates(lines, "default")
+    assert certs and certs[0].status == "CRITICAL"
+    assert certs[0].days == -3
+
+
+def test_certificate_consumers_from_mount_references() -> None:
+    lines = CERT_BLOCK + [
+        "SECRET MOUNT REFERENCES | SOURCE Pod specifications | namespace=default | cache age=0s",
+        "SECRET\tPOD\tVOLUME\tCONTAINER\tMOUNT PATH\tSUBPATH\tSTATUS",
+        "demo-tls\tdemo-web-1\tdata\tweb\t/etc/tls\t-\tCONFIGURED",
+    ]
+    certs = normalize_certificates(lines, "default")
+    assert certs[0].consumers == 1
 
 
 # --------------------------------------------------------------------------
