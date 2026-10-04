@@ -5,6 +5,7 @@ import {
   useDatabase,
   useDatabaseServices,
   usePods,
+  useSqlConsole,
   useStorage,
   useSystem,
 } from "@/api/queries";
@@ -25,6 +26,8 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { reportText } from "@/lib/format";
 import { useApp } from "@/state/AppContext";
 import type { DbServiceResource } from "@/types";
+
+import { SqlConsole } from "./SqlConsole";
 
 /** Read-only PostgreSQL / generic DB discovery.
  *
@@ -47,6 +50,10 @@ export function DatabasePage() {
 
   const ready = rows.filter((row) => row.status === "OK").length;
   const psql = Boolean(system.data?.data.capabilities.psql);
+  const consoleStatus = useSqlConsole();
+  const consoleEnabled = Boolean(
+    consoleStatus.data?.data.enabled && consoleStatus.data?.data.driverAvailable,
+  );
 
   const lines = useMemo(
     () =>
@@ -136,14 +143,16 @@ export function DatabasePage() {
             {psql ? "psql present" : "psql not installed"}
           </Badge>
         </CardHeader>
-        <CardBody className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-4">
+        <CardBody className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-5">
           <Metric label="Discovered services" value={String(rows.length)} />
           <Metric label="Ready endpoints" value={`${ready} / ${rows.length}`} />
           <Metric label="psql client" value={psql ? "AVAILABLE" : "NOT INSTALLED"} />
-          <Metric label="Row-level data" value="CLI ONLY" />
-          <p className="text-[11.5px] text-text-muted sm:col-span-2 lg:col-span-4">
-            Table, schema and row contents require an authenticated session. The engine exposes that
-            only in its interactive console so credentials never traverse the browser. Run{" "}
+          <Metric label="SQL console" value={consoleEnabled ? "ENABLED" : "DISABLED"} />
+          <Metric label="Row-level data" value={consoleEnabled ? "SQL TAB" : "CLI ONLY"} />
+          <p className="text-[11.5px] text-text-muted sm:col-span-2 lg:col-span-5">
+            Use the <span className="mono">SQL</span> tab for a read-only session (opt-in with{" "}
+            <span className="mono">DSWEB_ENABLE_SQL_CONSOLE=1</span>; credentials are used for one
+            request and never stored). Otherwise run{" "}
             <span className="mono">
               bash DevOps_K8s_Sentinel_FINAL_GP.sh --context {scope.context || "&lt;ctx&gt;"}{" "}
               --namespace {scope.namespace || "&lt;ns&gt;"}
@@ -157,6 +166,7 @@ export function DatabasePage() {
         <TabsList>
           <TabsTrigger value="services">Services</TabsTrigger>
           <TabsTrigger value="data">Data</TabsTrigger>
+          <TabsTrigger value="sql">SQL</TabsTrigger>
           <TabsTrigger value="report">Report</TabsTrigger>
           <TabsTrigger value="raw">Raw</TabsTrigger>
         </TabsList>
@@ -250,6 +260,10 @@ export function DatabasePage() {
               </Card>
             ))}
           </div>
+        </TabsContent>
+
+        <TabsContent value="sql">
+          <SqlConsole />
         </TabsContent>
 
         <TabsContent value="report">

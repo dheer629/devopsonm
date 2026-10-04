@@ -7,12 +7,13 @@ frontend served from the production `dist/` build.
 
 | Layer | Command | Result |
 | --- | --- | --- |
-| Backend unit + API contract | `python -m pytest -q` | **70 passed** |
+| Backend unit + API contract | `python -m pytest -q` | **114 passed** |
 | Frontend typecheck (strict) | `cd frontend && npm run typecheck` | **clean** |
 | Frontend unit | `cd frontend && npx vitest run` | **18 passed** (4 files) |
-| Frontend production build | `cd frontend && npm run build` | **built** (887 kB JS / 52 kB CSS; 272 kB / 10 kB gzip) |
+| Frontend production build | `cd frontend && npm run build` | **built** (896 kB JS / 53 kB CSS; 274 kB / 10 kB gzip) |
 | Browser E2E (dark + light) | `cd frontend && npx playwright test` | **68 passed** (34 tests × 2 themes) |
 | Accessibility (axe) | `cd frontend && npx playwright test e2e/a11y.spec.ts` | **24 passed** (12 routes × 2 themes) |
+| Opt-in live data (real DB + broker) | `scripts/demo-resources.sh up default` then the SQL/Topics tabs | **verified** — see *Opt-in live data validation* |
 | Live server smoke | `uvicorn app.main:app` + HTTP checks | `/api/v1/version` 200, `/api/v1/system` 200, `/` and `/workloads` 200, fail-safe operation returns `UNAVAILABLE` envelope (not 500) |
 
 ### Defects found and fixed during validation
@@ -122,7 +123,32 @@ Real captured formats that the parsers were aligned to:
   installed into the user site with `get-pip.py --user --break-system-packages`.
 
 
-## Reproduce everything
+## Opt-in live data validation
+
+The two opt-in features were validated against **real** infrastructure, not mocks. The demo
+fixtures deploy a PostgreSQL 16 pod and a single-node Kafka 3.9.1 (KRaft) broker, both exposed with
+NodePorts so the local adapter can reach them.
+
+| Check | Command / probe | Result |
+| --- | --- | --- |
+| Flags are inert by default | `pytest tests/test_live.py -k disabled_by_default` | **403 + explicit reason**, no connection attempted |
+| Kafka topic listing | `POST /api/v1/kafka/topics {"host":"172.18.0.2","port":30092}` | **200**, `events`, `orders`, `payments` — 3 partitions each, `source: LIVE` |
+| SQL console returns real rows | `POST /api/v1/database/query` with `select current_database() as db, current_user as who` | **200**, `columns: [db, who]`, `rows: [[demo, demo]]`, `source: LIVE` |
+| Write statements are rejected | `drop table t` | **400** `only read-only statements are allowed: …` |
+| Chained statements are rejected | `select 1; delete from t` | **400** `only one statement per request is allowed` |
+| Literals are not mistaken for SQL | `select '; drop table x' as sneaky` | **200** — the literal is returned as data |
+| Unreachable broker is reported, not hidden | `POST /api/v1/kafka/topics` on port 39999 | **400** `cannot reach the broker: [Errno 111] Connection refused` |
+
+Two protocol details are worth recording because they cost real debugging time:
+
+1. **Kafka 3.9 removed Metadata v0** (KIP-896). A version-0 request is accepted at the TCP level and
+   then closed with no response; the adapter must ask for **version 1**, whose response adds a
+   nullable `rack` per broker, a `controller_id` before the topic array and an `is_internal` flag per
+   topic. `test_kafka_request_is_a_single_metadata_v1_call` pins this.
+2. **The engine's PostgreSQL read-only session is interactive-only**, which is why the console is a
+   separate, opt-in, allowlisted path rather than another engine operation.
+
+
 
 ```bash
 ./scripts/test.sh

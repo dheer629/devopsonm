@@ -70,6 +70,17 @@ class Settings(BaseSettings):
     incident_id: str | None = None
     open_browser: bool = False
 
+    # Opt-in live-data features. Both default to OFF so the browser stays a pure
+    # read-only supervision surface unless the operator explicitly enables them.
+    #   DSWEB_ENABLE_SQL_CONSOLE=1     -> POST /api/v1/database/query
+    #   DSWEB_ENABLE_KAFKA_TOPICS=1    -> POST /api/v1/kafka/topics
+    # See docs/SECURITY.md for the full contract.
+    enable_sql_console: bool = False
+    enable_kafka_topics: bool = False
+    sql_max_rows: int = 200
+    sql_timeout_s: float = 15.0
+    kafka_timeout_s: float = 8.0
+
     def engine_available(self) -> bool:
         return self.engine_path.is_file()
 

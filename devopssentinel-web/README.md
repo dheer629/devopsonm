@@ -91,6 +91,25 @@ first consumer, so a PVC with no consuming pod stays `Pending` — which the Sto
 The read-only adapter is unaffected: the script performs the explicitly scoped setup, exactly like the
 `devopssentinel-e2e/` harness.
 
+## Opt-in live data (read-only SQL console + Kafka topics)
+
+Both are **off by default**. The browser stays a pure read-only supervision surface unless you
+explicitly enable them:
+
+```bash
+DSWEB_ENABLE_SQL_CONSOLE=1 DSWEB_ENABLE_KAFKA_TOPICS=1 ./devopssentinel-web
+```
+
+| Where | What it does |
+| --- | --- |
+| `/database` → **SQL** tab | Runs ONE read-only statement against a host/port/database/username/password you type in. Credentials live in one request body only — never stored, logged, exported or audited. Only `SELECT`/`WITH`/`SHOW`/`EXPLAIN`/`TABLE`/`VALUES`/`\d` is accepted, chained statements are rejected, and the session is forced read-only **on the server** (`SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY`) so it cannot mutate data. |
+| `/kafka` → **Topics** tab | Sends ONE read-only Kafka `Metadata` (API key 3, version 1) request and lists topic names, partition counts and brokers. No credentials, no consumer groups, no offsets, no writes. |
+
+The demo fixtures are exposed for exactly this: **PostgreSQL at `<node-ip>:30432`** (database/user
+`demo`) and **Kafka at `<node-ip>:30092`** with the topics `orders`, `payments` and `events`
+(3 partitions each). The full contract — including what the allowlist does *not* protect against —
+is in [`docs/SECURITY.md` §2a](docs/SECURITY.md).
+
 ## Build
 
 ```bash
@@ -115,7 +134,9 @@ The read-only adapter is unaffected: the script performs the explicitly scoped s
 | PKI / TLS dashboard, expiry posture, consumer/reference tracing | ✅ |
 | Network services + endpoint gaps, Storage PVC centre (namespace, capacity, StorageClass, consuming pod) | ✅ |
 | Database page: Services table, Data view (backing pods + PVCs), Report/Raw + availability panel | ✅ |
-| Kafka page: Brokers table with bootstrap candidates, Topics availability, Data view, Report/Raw | ✅ |
+| Database page: **SQL** tab — opt-in read-only console with allowlist + server-forced read-only session | ✅ |
+| Kafka page: Brokers table with bootstrap candidates, **Topics** tab (live listing + availability), Data view, Report/Raw | ✅ |
+| Kafka page: **Topics** tab — opt-in live topic/partition listing via one Metadata request | ✅ |
 | ETDP / Smart Health report views | ✅ |
 | Incident workspace (`/incidents/:id`), PRE/POST baseline comparison (`/baselines`), Exports page (`/exports`) | ✅ |
 | Doctor capability matrix, Settings, pins, history, local exports (JSON/CSV/NDJSON) | ✅ |
@@ -123,7 +144,7 @@ The read-only adapter is unaffected: the script performs the explicitly scoped s
 | 7 professional themes (5 dark / 2 light) + system auto, swatch picker, bubble surface language | ✅ |
 | Virtualized tables (5,000-row inventory test), status = icon + text + colour | ✅ |
 | SSE endpoints for live refresh and streamed logs | ✅ |
-| pytest (70), Vitest (18), Playwright smoke + axe (frontend-only, fixture-backed) | ✅ |
+| pytest (114), Vitest (18), Playwright smoke + axe (frontend-only, fixture-backed) | ✅ |
 | Live TLS inspection, interactive logs, DB/Kafka credential prompts | ⛔ CLI only (see parity matrix) |
 
 See **[docs/FEATURE_PARITY_MATRIX.md](docs/FEATURE_PARITY_MATRIX.md)** for the complete

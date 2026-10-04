@@ -3,7 +3,8 @@
 Read-only guarantee: this process never mutates Kubernetes. The only
 cluster-touching code paths are (a) the DevOpsSentinel engine invoked through
 an allowlisted operation id and (b) two narrowly-scoped read-only kubectl
-discovery calls.
+discovery calls. Two additional, operator-opt-in features talk to a database
+and a Kafka broker directly (see ``api/live.py``); both are disabled by default.
 """
 
 from __future__ import annotations
@@ -17,7 +18,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from .api import gitops, graph, network, operations, pki, sse, storage, system, workloads
+from .api import gitops, graph, live, network, operations, pki, sse, storage, system, workloads
 from .config import API_SCHEMA_VERSION, SUPERVISION_MODE, WEB_VERSION, settings
 from .security import origin_allowed
 
@@ -89,7 +90,7 @@ def create_app() -> FastAPI:
             response.headers.setdefault(key, value)
         return response
 
-    for module in (system, workloads, graph, gitops, pki, network, storage, operations, sse):
+    for module in (system, workloads, graph, gitops, pki, network, storage, operations, sse, live):
         app.include_router(module.router)
 
     @app.get("/api/v1/version", tags=["system"])

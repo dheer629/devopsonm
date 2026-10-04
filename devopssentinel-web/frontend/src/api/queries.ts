@@ -12,6 +12,7 @@ import type {
   GitOpsObject,
   Graph,
   HistoryItem,
+  KafkaConsoleStatus,
   KafkaServiceResource,
   LogBundle,
   NoteItem,
@@ -19,8 +20,11 @@ import type {
   Pin,
   Pod,
   PVCResource,
+  QueryResultPayload,
   ServiceResource,
+  SqlConsoleStatus,
   SystemInfo,
+  TopicListingPayload,
   Workload,
 } from "@/types";
 
@@ -261,6 +265,44 @@ export function useKafkaServices(scope: Scope, enabled = true) {
       scope,
     ),
     enabled,
+  });
+}
+
+/** Opt-in live-data status probes (cheap, cached for a minute). */
+export function useSqlConsole() {
+  return useQuery<Envelope<SqlConsoleStatus>>({
+    queryKey: ["sql-console"],
+    queryFn: () => getEnvelope<SqlConsoleStatus>("/api/v1/database/console"),
+    staleTime: 60_000,
+  });
+}
+
+export function useKafkaConsole() {
+  return useQuery<Envelope<KafkaConsoleStatus>>({
+    queryKey: ["kafka-console"],
+    queryFn: () => getEnvelope<KafkaConsoleStatus>("/api/v1/kafka/console"),
+    staleTime: 60_000,
+  });
+}
+
+export interface QueryRequestPayload {
+  host: string;
+  port: number;
+  database: string;
+  username: string;
+  password: string;
+  sql: string;
+}
+
+export function useRunQuery() {
+  return useMutation<Envelope<QueryResultPayload>, Error, QueryRequestPayload>({
+    mutationFn: (payload) => postJson<QueryResultPayload>("/api/v1/database/query", payload),
+  });
+}
+
+export function useListTopics() {
+  return useMutation<Envelope<TopicListingPayload>, Error, { host: string; port: number }>({
+    mutationFn: (payload) => postJson<TopicListingPayload>("/api/v1/kafka/topics", payload),
   });
 }
 

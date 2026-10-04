@@ -346,6 +346,32 @@ export async function installFixtures(page: Page): Promise<void> {
         raw: rawEvidence(),
       });
     }
+    if (path.endsWith("/database/console")) {
+      return json(
+        envelope(
+          {
+            enabled: false,
+            driverAvailable: false,
+            maxRows: 200,
+            timeoutS: 15,
+            reason: "disabled: start the backend with DSWEB_ENABLE_SQL_CONSOLE=1",
+          },
+          { source: "LOCAL" },
+        ),
+      );
+    }
+    if (path.endsWith("/kafka/console")) {
+      return json(
+        envelope(
+          {
+            enabled: false,
+            timeoutS: 8,
+            reason: "disabled: start the backend with DSWEB_ENABLE_KAFKA_TOPICS=1",
+          },
+          { source: "LOCAL" },
+        ),
+      );
+    }
     if (path.endsWith("/database/services")) {
       return json({ envelope: envelope(DB_SERVICES), raw: rawEvidence() });
     }

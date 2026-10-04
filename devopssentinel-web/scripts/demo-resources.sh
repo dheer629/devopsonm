@@ -64,8 +64,10 @@ fi
 
 [[ "$ACTION" == "up" ]] || { printf 'usage: %s {up|down|pvc} [NAMESPACE] [NAME] [SIZE]\n' "$0" >&2; exit 2; }
 
-log "applying demo fixtures to namespace $NS"
-kubectl apply -n "$NS" -f "$MANIFEST"
+NODE_IP=$(kubectl get nodes -o jsonpath='{.items[0].status.addresses[?(@.type=="InternalIP")].address}' 2>/dev/null || true)
+NODE_IP=${NODE_IP:-127.0.0.1}
+log "applying demo fixtures to namespace $NS (node IP $NODE_IP)"
+sed "s/__NODE_IP__/$NODE_IP/g" "$MANIFEST" | kubectl apply -n "$NS" -f -
 
 # TLS Secret (PKI / TLS page). Generated locally; the private key never leaves
 # the cluster and is never read back by the read-only adapter.
@@ -84,6 +86,22 @@ kubectl -n "$NS" label secret demo-tls devopssentinel.io/demo=true --overwrite >
 log "waiting for demo workloads to become ready"
 kubectl -n "$NS" rollout status deployment/demo-web --timeout=120s || true
 kubectl -n "$NS" rollout status deployment/demo-postgres --timeout=120s || true
+kubectl -n "$NS" rollout status deployment/demo-kafka --timeout=240s || true
+
+# Demo topics, so the opt-in Topics view has something real to list.
+KAFKA_POD=$(kubectl -n "$NS" get pods -l app=demo-kafka -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
+if [[ -n "$KAFKA_POD" ]]; then
+    log "creating demo topics on $KAFKA_POD"
+    for topic in orders payments events; do
+        kubectl -n "$NS" exec "$KAFKA_POD" -- /opt/kafka/bin/kafka-topics.sh \
+            --bootstrap-server localhost:9092 --create --if-not-exists \
+            --topic "$topic" --partitions 3 --replication-factor 1 >/dev/null 2>&1 || true
+    done
+fi
+
+log "local (NodePort) endpoints for the opt-in views:"
+log "  PostgreSQL  ${NODE_IP}:30432   (user/db/password: demo)"
+log "  Kafka       ${NODE_IP}:30092"
 
 log "objects in namespace $NS:"
 kubectl -n "$NS" get deploy,svc,pvc,secret -l "$LABEL" 2>/dev/null || true

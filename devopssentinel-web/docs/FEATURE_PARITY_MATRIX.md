@@ -52,8 +52,8 @@ Legend
 | Interactive pod log follow / `previous` / container selection | PARTIAL | Adapter exposes report-captured lines with `PARTIAL` status and an explicit warning; the engine's live follower is CLI ONLY |
 | Full log center (raw cache, summary, audit log) | PARTIAL | Audit trail + diagnostics exposed; terminal pager is CLI ONLY |
 | Live TLS probe / certificate-vs-endpoint comparison | CLI ONLY | `POST /api/v1/tls/inspect` returns `UNAVAILABLE` with a reason instead of opening arbitrary sockets from browser input |
-| Interactive read-only PostgreSQL session | CLI ONLY | Credentials must never traverse the browser. `/database` shows the Services table, the backing pods/PVCs and an explicit availability panel with the exact console command |
-| Kafka interactive tools | CLI ONLY | Same reason. `/kafka` shows brokers, bootstrap candidates and a **Topics availability** panel that states what can and cannot be read |
+| Interactive read-only PostgreSQL session | SUPPORTED | `/database` → **SQL** tab (`POST /api/v1/database/query`). Opt-in: `DSWEB_ENABLE_SQL_CONSOLE=1`. One read-only statement, server-forced read-only session, credentials never stored, logged or audited |
+| Kafka topic listing | SUPPORTED | `/kafka` → **Topics** tab (`POST /api/v1/kafka/topics`). Opt-in: `DSWEB_ENABLE_KAFKA_TOPICS=1`. A single read-only Metadata v1 request; consumer groups and offsets stay CLI ONLY |
 | Incident session + exports under `~/.devopssentinel/evidence/ID` | SUPPORTED | `/incidents/:id` workspace (notes + evidence + pins + exports), `/evidence`, `/api/v1/notes/{id}`, `--incident` launcher flag |
 | PRE / POST change validation | SUPPORTED | `/baselines` (`GET/POST /api/v1/baselines`, `POST /api/v1/baselines/compare`) with UNCHANGED / IMPROVED / DEGRADED / NEW / REMOVED classification |
 | `export_center` | SUPPORTED | `/exports` page + `/settings` + `GET /api/v1/exports/{domain}` (JSON/CSV/NDJSON) |
@@ -88,6 +88,8 @@ Legend
 | --- | --- |
 | `GET /api/v1/contexts`, `/namespaces` | Two narrowly-scoped read-only kubectl discovery calls; the engine exposes no list mode |
 | `GET /api/v1/database/services`, `/kafka/services` | Structured views of the engine's own discovery tables (metadata only) so the pages can render tables instead of raw text |
+| `GET /api/v1/database/console`, `POST /api/v1/database/query` | **Opt-in** (`DSWEB_ENABLE_SQL_CONSOLE=1`). Read-only SQL console; see docs/SECURITY.md §2a for the full contract |
+| `GET /api/v1/kafka/console`, `POST /api/v1/kafka/topics` | **Opt-in** (`DSWEB_ENABLE_KAFKA_TOPICS=1`). One read-only Kafka Metadata v1 request; see docs/SECURITY.md §2a |
 | `GET /api/v1/system`, `/session`, `/diagnostics` | Web-only surface (versions, cache stats, audit trail) |
 | Pins, history, notes, baselines | Local operator convenience under `~/.devopssentinel-web` |
 | Export formatting (CSV/NDJSON) | Browser download convenience; values come from the engine unchanged |
@@ -96,9 +98,9 @@ Legend
 
 | Status | Count |
 | --- | --- |
-| SUPPORTED | 20 |
+| SUPPORTED | 22 |
 | PARTIAL | 9 |
-| CLI ONLY | 4 |
+| CLI ONLY | 2 |
 | BLOCKED | 6 |
 | NOT APPLICABLE | 4 |
 

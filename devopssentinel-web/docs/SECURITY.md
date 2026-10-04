@@ -28,6 +28,54 @@ DevOpsSentinel Web runs on an operator workstation, binds to `127.0.0.1`, and ex
 | Unbounded work | Per-operation timeouts (≤ 300 s), output cap (8 MB), child termination, TTL cache + single-flight | `config`, `runner`, `cache` |
 | Credential persistence | Only theme/panel/table preferences are stored; never tokens, passwords, Secrets or keys | `state/AppContext.tsx` |
 | LAN exposure | 127.0.0.1 default; `--listen` requires an explicit `--token` | `devopssentinel-web` |
+| Opt-in live data | Both live-data features are **off by default** and each has its own flag | `config.enable_sql_console`, `config.enable_kafka_topics` |
+
+## 2a. Opt-in live-data exceptions (read this before enabling)
+
+Two features deliberately step outside the "only the engine talks to the cluster" rule. They exist
+because the engine exposes PostgreSQL read-only sessions and Kafka topic listing **only** in its
+interactive console, and an operator asked for the same checks in the browser. Both are **disabled
+unless explicitly enabled**, and neither weakens any other control.
+
+| Flag | Endpoints | What it does |
+| --- | --- | --- |
+| `DSWEB_ENABLE_SQL_CONSOLE=1` | `GET /api/v1/database/console`, `POST /api/v1/database/query` | Runs ONE read-only SQL statement through `pg8000` against a host/port/database/username/password the operator types into the page |
+| `DSWEB_ENABLE_KAFKA_TOPICS=1` | `GET /api/v1/kafka/console`, `POST /api/v1/kafka/topics` | Sends ONE read-only Kafka Metadata (API key 3, version 1) request to a bootstrap address and reports topic names, partition counts and brokers |
+
+### SQL console contract (`services/sqltool.py`)
+
+* **Disabled by default.** With the flag unset the endpoints return `403` and the UI shows why.
+* **Credentials are ephemeral.** They live in React component state and in one request body. They are
+  never written to disk, never included in the audit trail, never logged, and never echoed back.
+  The audit record contains only `host:port/database` and the returned row count.
+* **Single statement only.** A `;` followed by anything else is rejected, so the console cannot be
+  used to chain statements.
+* **Read-only allowlist.** The statement must start with `SELECT`, `WITH`, `SHOW`, `EXPLAIN`,
+  `TABLE`, `VALUES` or a `\d`-style meta-command. Comments and string literals are stripped before
+  keyword matching, so `'...; drop table x'` inside a literal is harmless and a hidden
+  `DELETE`/`DROP`/`SET`/`COPY`/`CALL`/`GRANT`/`VACUUM` keyword is rejected.
+* **Server-enforced read-only.** The session issues
+  `SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY`, so even a validation bypass cannot mutate
+  data — PostgreSQL itself refuses the write.
+* **Bounded.** `statement_timeout` (default 15 s), a wall-clock `asyncio` timeout, and a row cap
+  (default 200) with an explicit `truncated` flag.
+* **Least privilege is still your job.** The console connects as whatever role you supply; use a
+  role that only has `SELECT`. Function calls such as `pg_read_file()` are not blocked by the
+  allowlist — the read-only transaction and the role's grants are what stop them.
+
+### Kafka topic listing contract (`services/kafkatool.py`)
+
+* **Disabled by default.** With the flag unset the endpoint returns `403` and the UI shows why.
+* **One request, one response.** A single `Metadata` request with `topics = -1` (all). No consumer
+  groups, no offsets, no produce/consume, no admin mutations.
+* **No credentials at all.** SASL and TLS material are not accepted, transmitted or stored; the
+  request is plaintext and read-only.
+* **Bounded.** Socket timeout (default 8 s) plus a wall-clock timeout, and a 500-topic cap with an
+  explicit `truncated` flag.
+
+Both features are covered by `backend/tests/test_live.py`, which asserts the flags are inert by
+default, that every forbidden statement class is rejected, and that the Kafka wire request is a
+single v1 Metadata call.
 
 ## 3. Redaction
 

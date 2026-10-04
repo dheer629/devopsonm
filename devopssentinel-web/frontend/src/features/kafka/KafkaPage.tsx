@@ -1,7 +1,14 @@
 import type { ColumnDef } from "@tanstack/react-table";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
-import { useKafka, useKafkaServices, usePods, useSystem } from "@/api/queries";
+import {
+  useKafka,
+  useKafkaConsole,
+  useKafkaServices,
+  useListTopics,
+  usePods,
+  useSystem,
+} from "@/api/queries";
 import { DataTable } from "@/components/DataTable";
 import {
   EmptyState,
@@ -14,7 +21,9 @@ import {
   StatusPill,
 } from "@/components/common";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { reportText } from "@/lib/format";
 import { useApp } from "@/state/AppContext";
@@ -57,6 +66,13 @@ export function KafkaPage() {
     }
     return byName;
   }, [rows, podRows]);
+
+  const consoleStatus = useKafkaConsole();
+  const listTopics = useListTopics();
+  const [brokerHost, setBrokerHost] = useState(() => window.location.hostname || "127.0.0.1");
+  const [brokerPort, setBrokerPort] = useState("30092");
+  const topicsEnabled = Boolean(consoleStatus.data?.data.enabled);
+  const listing = listTopics.data?.data;
 
   const columns = useMemo<ColumnDef<KafkaServiceResource, unknown>[]>(
     () => [
@@ -128,7 +144,7 @@ export function KafkaPage() {
             label="Bootstrap candidates"
             value={String(rows.filter((row) => row.bootstrap).length)}
           />
-          <Metric label="Topic listing" value="CLI ONLY" />
+          <Metric label="Topic listing" value={topicsEnabled ? "LIVE" : "CLI ONLY"} />
           <div className="space-y-1 sm:col-span-2 lg:col-span-4">
             {rows.length === 0 ? (
               <p className="text-[11.5px] text-warning">
@@ -139,10 +155,11 @@ export function KafkaPage() {
               </p>
             ) : null}
             <p className="text-[11.5px] text-text-muted">
-              Topic, partition and consumer-group data requires an authenticated broker session. The
-              engine performs that in its interactive console, so credentials never traverse the
-              browser. Run <span className="mono">{engineCmd}</span> and choose{" "}
-              <span className="mono">Kafka → List topics</span>.
+              The <span className="mono">Topics</span> tab lists topic names and partitions with a
+              single read-only Metadata request when the backend runs with{" "}
+              <span className="mono">DSWEB_ENABLE_KAFKA_TOPICS=1</span>. Consumer-group and offset
+              detail still needs the engine console: run <span className="mono">{engineCmd}</span> and
+              choose <span className="mono">Kafka → List topics</span>.
             </p>
           </div>
         </CardBody>
@@ -183,40 +200,161 @@ export function KafkaPage() {
         </TabsContent>
 
         <TabsContent value="topics">
-          <Card>
-            <CardHeader>
-              <CardTitle>Topics</CardTitle>
-              <Badge tone="unknown">UNAVAILABLE</Badge>
-            </CardHeader>
-            <CardBody className="space-y-2">
-              {rows.length === 0 ? (
-                <EmptyState
-                  title="No broker to query"
-                  detail="Deploy a Service named kafka (or labelled kafka) and it will be reported here with a bootstrap candidate."
-                />
-              ) : (
-                <ul className="space-y-1">
-                  {rows.map((row) => (
-                    <li
-                      key={row.name}
-                      className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-2 py-1"
-                    >
-                      <span className="mono text-[11.5px]">{row.bootstrap || row.name}</span>
-                      <span className="text-[11px] text-text-muted">
-                        {row.bootstrap
-                          ? "run: kafka-topics.sh --bootstrap-server " + row.bootstrap + " --list"
-                          : "no usable port reported"}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              )}
-              <p className="text-[11.5px] text-text-muted">
-                Topic data is not read by the browser adapter. This page proves the broker exists and
-                gives you the exact bootstrap address; the engine console lists the topics.
-              </p>
-            </CardBody>
-          </Card>
+          <div className="space-y-3">
+            <Card>
+              <CardHeader>
+                <CardTitle>List topics</CardTitle>
+                <Badge tone={topicsEnabled ? "info" : "unknown"}>
+                  {topicsEnabled ? "ENABLED" : "DISABLED"}
+                </Badge>
+              </CardHeader>
+              <CardBody className="space-y-2">
+                {!topicsEnabled ? (
+                  <p className="text-[12.5px] text-warning">
+                    {consoleStatus.data?.data.reason ?? "checking the topic-listing status…"} — restart
+                    the backend with <span className="mono">DSWEB_ENABLE_KAFKA_TOPICS=1</span> to turn
+                    it on.
+                  </p>
+                ) : null}
+                <p className="text-[11.5px] text-text-muted">
+                  A single read-only Kafka <span className="mono">Metadata</span> request against the
+                  bootstrap address. No credentials, no consumer groups, no offsets, no writes.
+                </p>
+                <div className="flex flex-wrap items-end gap-2">
+                  <label className="block">
+                    <span className="text-[10.5px] uppercase tracking-wide text-text-faint">
+                      Bootstrap host
+                    </span>
+                    <Input
+                      aria-label="Bootstrap host"
+                      className="mt-1 w-[220px]"
+                      value={brokerHost}
+                      onChange={(event) => setBrokerHost(event.target.value)}
+                    />
+                  </label>
+                  <label className="block">
+                    <span className="text-[10.5px] uppercase tracking-wide text-text-faint">
+                      Port
+                    </span>
+                    <Input
+                      aria-label="Bootstrap port"
+                      className="mt-1 w-[110px]"
+                      value={brokerPort}
+                      onChange={(event) => setBrokerPort(event.target.value)}
+                    />
+                  </label>
+                  <Button
+                    variant="primary"
+                    size="sm"
+                    disabled={!topicsEnabled || listTopics.isPending}
+                    onClick={() => listTopics.mutate({ host: brokerHost, port: Number(brokerPort) })}
+                  >
+                    List topics
+                  </Button>
+                  {listTopics.isPending ? (
+                    <span className="text-[11.5px] text-text-muted">asking the broker…</span>
+                  ) : null}
+                </div>
+                <p className="text-[11px] text-text-faint">
+                  The bundled demo broker is exposed at{" "}
+                  <span className="mono">{window.location.hostname || "127.0.0.1"}:30092</span>.
+                </p>
+                {listTopics.isError ? (
+                  <p className="text-[12px] text-critical">{(listTopics.error as Error).message}</p>
+                ) : null}
+              </CardBody>
+            </Card>
+
+            {listing ? (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Topics</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <Badge tone="neutral">{listing.topics.length} topics</Badge>
+                    {listing.truncated ? <Badge tone="warning">truncated</Badge> : null}
+                    <span className="mono text-[11px] text-text-muted">{listing.bootstrap}</span>
+                  </div>
+                </CardHeader>
+                <CardBody className="p-0">
+                  {listing.topics.length === 0 ? (
+                    <p className="p-3 text-[12.5px] text-text-muted">
+                      The broker is reachable but reports no topics.
+                    </p>
+                  ) : (
+                    <table className="w-full border-collapse text-[12px]">
+                      <thead className="bg-panel-2">
+                        <tr>
+                          <th scope="col" className="px-3 py-1.5 text-left text-[10.5px] uppercase tracking-wide text-text-muted">
+                            Topic
+                          </th>
+                          <th scope="col" className="px-3 py-1.5 text-left text-[10.5px] uppercase tracking-wide text-text-muted">
+                            Partitions
+                          </th>
+                          <th scope="col" className="px-3 py-1.5 text-left text-[10.5px] uppercase tracking-wide text-text-muted">
+                            Kind
+                          </th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {listing.topics.map((topic) => (
+                          <tr key={topic.name} className="border-b border-border/50">
+                            <td className="mono px-3 py-1">{topic.name}</td>
+                            <td className="mono px-3 py-1">{topic.partitions}</td>
+                            <td className="px-3 py-1">
+                              <Badge tone={topic.internal ? "unknown" : "ok"}>
+                                {topic.internal ? "internal" : "user"}
+                              </Badge>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                  <div className="border-t border-border px-3 py-2 text-[11.5px] text-text-muted">
+                    Brokers:{" "}
+                    <span className="mono">{listing.brokers.join(", ") || "none reported"}</span>
+                  </div>
+                </CardBody>
+              </Card>
+            ) : null}
+
+            <Card>
+              <CardHeader>
+                <CardTitle>Bootstrap candidates</CardTitle>
+                <Badge tone="neutral">{rows.length} services</Badge>
+              </CardHeader>
+              <CardBody className="space-y-2">
+                {rows.length === 0 ? (
+                  <EmptyState
+                    title="No broker discovered"
+                    detail="Deploy a Service named kafka (or labelled kafka) and it will be reported here with a bootstrap candidate."
+                  />
+                ) : (
+                  <ul className="space-y-1">
+                    {rows.map((row) => (
+                      <li
+                        key={row.name}
+                        className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border px-2 py-1"
+                      >
+                        <span className="mono text-[11.5px]">{row.bootstrap || row.name}</span>
+                        <span className="text-[11px] text-text-muted">
+                          {row.bootstrap
+                            ? "in-cluster: kafka-topics.sh --bootstrap-server " +
+                              row.bootstrap +
+                              " --list"
+                            : "no usable port reported"}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="text-[11.5px] text-text-muted">
+                  Topic, partition and consumer-group detail is available through the opt-in listing
+                  above or the engine console; nothing is read unless you ask for it.
+                </p>
+              </CardBody>
+            </Card>
+          </div>
         </TabsContent>
 
         <TabsContent value="data">

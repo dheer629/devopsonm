@@ -145,6 +145,41 @@ export interface KafkaServiceResource {
   status: string;
 }
 
+export interface SqlConsoleStatus {
+  enabled: boolean;
+  driverAvailable: boolean;
+  maxRows: number;
+  timeoutS: number;
+  reason: string;
+}
+
+export interface QueryResultPayload {
+  columns: string[];
+  rows: (string | number | boolean | null)[][];
+  rowCount: number;
+  truncated: boolean;
+  target: string;
+}
+
+export interface KafkaConsoleStatus {
+  enabled: boolean;
+  timeoutS: number;
+  reason: string;
+}
+
+export interface TopicInfo {
+  name: string;
+  partitions: number;
+  internal: boolean;
+}
+
+export interface TopicListingPayload {
+  bootstrap: string;
+  brokers: string[];
+  topics: TopicInfo[];
+  truncated: boolean;
+}
+
 export interface GraphNode {
   id: string;
   kind: string;
