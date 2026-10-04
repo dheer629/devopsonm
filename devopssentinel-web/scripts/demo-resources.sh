@@ -8,6 +8,12 @@
 #
 #   scripts/demo-resources.sh up   [NAMESPACE]   # default namespace: default
 #   scripts/demo-resources.sh down [NAMESPACE]
+#   scripts/demo-resources.sh pvc  [NAMESPACE] [NAME] [SIZE]
+#
+# `up` also seeds a small PostgreSQL schema (scripts/seed-demo-data.sh) and
+# creates Kafka topics, records and a consumer group, so the Database and Kafka
+# pages have real data. PostgreSQL and Kafka both persist to PersistentVolumes,
+# so the data survives a pod or cluster restart.
 #
 # Images are pinned to what is already present in the demo vcluster so no
 # registry access is required. Everything carries the label
@@ -88,15 +94,36 @@ kubectl -n "$NS" rollout status deployment/demo-web --timeout=120s || true
 kubectl -n "$NS" rollout status deployment/demo-postgres --timeout=120s || true
 kubectl -n "$NS" rollout status deployment/demo-kafka --timeout=240s || true
 
-# Demo topics, so the opt-in Topics view has something real to list.
+# Real tables and rows, so the Database page (and the opt-in SQL console) has
+# something meaningful to show. Idempotent: it drops and recreates the schema.
+log "seeding the demo PostgreSQL schema"
+if ! bash "$SCRIPT_DIR/seed-demo-data.sh" "$NS" >/dev/null 2>&1; then
+    log "  seed skipped - run scripts/seed-demo-data.sh $NS manually"
+fi
+
+# Demo topics, records and a consumer group, so the opt-in Topics view and the
+# Kafka diagnostics have something real to read. Everything goes through the
+# broker's own CLI, so this works even when the workstation has no Kafka tools.
 KAFKA_POD=$(kubectl -n "$NS" get pods -l app=demo-kafka -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
 if [[ -n "$KAFKA_POD" ]]; then
     log "creating demo topics on $KAFKA_POD"
-    for topic in orders payments events; do
+    for topic in orders payments events audit-log; do
         kubectl -n "$NS" exec "$KAFKA_POD" -- /opt/kafka/bin/kafka-topics.sh \
             --bootstrap-server localhost:9092 --create --if-not-exists \
             --topic "$topic" --partitions 3 --replication-factor 1 >/dev/null 2>&1 || true
     done
+    log "producing 25 demo records into orders, payments and events"
+    for topic in orders payments events; do
+        for seq in $(seq 1 25); do
+            printf '{"topic":"%s","seq":%s,"source":"demo-seed"}\n' "$topic" "$seq"
+        done | kubectl -n "$NS" exec -i "$KAFKA_POD" -- \
+            /opt/kafka/bin/kafka-console-producer.sh \
+            --bootstrap-server localhost:9092 --topic "$topic" >/dev/null 2>&1 || true
+    done
+    log "committing offsets for the demo-reader consumer group"
+    kubectl -n "$NS" exec "$KAFKA_POD" -- /opt/kafka/bin/kafka-console-consumer.sh \
+        --bootstrap-server localhost:9092 --topic orders --group demo-reader \
+        --from-beginning --max-messages 10 --timeout-ms 15000 >/dev/null 2>&1 || true
 fi
 
 log "local (NodePort) endpoints for the opt-in views:"

@@ -121,34 +121,50 @@ Real captured formats that the parsers were aligned to:
   user's `~/.kube/config` was backed up before any edit.
 * WSL Ubuntu had no `pip`/`python3-venv` (PEP 668 externally managed), so backend dependencies were
   installed into the user site with `get-pip.py --user --break-system-packages`.
+* `certificate-authority-data` and `insecure-skip-tls-verify` are mutually exclusive in a kubeconfig,
+  so refreshing the stale `server:` URL must drop the CA bundle rather than add the insecure flag
+  alongside it.
+* WSL occasionally tears the distro down between commands, which kills detached background
+  processes. Long apply/seed/verify cycles are therefore run as a single script.
 
 
 ## Opt-in live data validation
 
 The two opt-in features were validated against **real** infrastructure, not mocks. The demo
-fixtures deploy a PostgreSQL 16 pod and a single-node Kafka 3.9.1 (KRaft) broker, both exposed with
-NodePorts so the local adapter can reach them.
+fixtures deploy a PostgreSQL 16 pod and a single-node Kafka 3.9.1 (KRaft) broker, both on
+PersistentVolumes and exposed with NodePorts so the local adapter can reach them.
 
 | Check | Command / probe | Result |
 | --- | --- | --- |
 | Flags are inert by default | `pytest tests/test_live.py -k disabled_by_default` | **403 + explicit reason**, no connection attempted |
-| Kafka topic listing | `POST /api/v1/kafka/topics {"host":"172.18.0.2","port":30092}` | **200**, `events`, `orders`, `payments` — 3 partitions each, `source: LIVE` |
-| SQL console returns real rows | `POST /api/v1/database/query` with `select current_database() as db, current_user as who` | **200**, `columns: [db, who]`, `rows: [[demo, demo]]`, `source: LIVE` |
-| Write statements are rejected | `drop table t` | **400** `only read-only statements are allowed: …` |
-| Chained statements are rejected | `select 1; delete from t` | **400** `only one statement per request is allowed` |
+| Kafka topic listing | `POST /api/v1/kafka/topics {"host":"172.18.0.2","port":30092}` | **200**, `events`, `orders`, `payments`, `audit-log`, `__consumer_offsets` — `source: LIVE` |
+| SQL console returns real rows | `POST /api/v1/database/query` against the seeded schema | **200**, e.g. `information_schema.tables` → `demo_customers`, `demo_events`, `demo_orders`, `v_customer_value` |
+| Aggregates work | `select status, count(*), sum(amount) from public.demo_orders group by status` | **200**, 6 rows with real totals |
+| Write statements are rejected | `drop table public.demo_orders`, `update … set amount = 0` | **400** `only read-only statements are allowed: …` |
+| Chained statements are rejected | `select 1; delete from public.demo_orders` | **400** `only one statement per request is allowed` |
 | Literals are not mistaken for SQL | `select '; drop table x' as sneaky` | **200** — the literal is returned as data |
 | Unreachable broker is reported, not hidden | `POST /api/v1/kafka/topics` on port 39999 | **400** `cannot reach the broker: [Errno 111] Connection refused` |
+| Doctor capability grid | `GET /api/v1/system` | **all 9 AVAILABLE**: engine, bash, kubectl, jq, openssl, flux, helm, psql, kafka |
+| Doctor engine capability report | `GET /api/v1/doctor` | `psql`, `kafka-topics.sh`, `kafka-topics`, `kafka-consumer-groups.sh`, `kafka-consumer-groups`, API discovery, Flux CRDs, cert-manager CRDs and Metrics API all **AVAILABLE** |
+| PKI includes a cert-manager certificate | `GET /api/v1/certificates` | `demo-certman-tls` (cert-manager, 89 days) and `demo-tls` (364 days), both `OK` |
+| Storage reports consumers | `GET /api/v1/storage` | 4 Bound PVCs, each with its consuming pod |
 
-Two protocol details are worth recording because they cost real debugging time:
+Four protocol/environment details cost real debugging time and are worth recording:
 
 1. **Kafka 3.9 removed Metadata v0** (KIP-896). A version-0 request is accepted at the TCP level and
    then closed with no response; the adapter must ask for **version 1**, whose response adds a
    nullable `rack` per broker, a `controller_id` before the topic array and an `is_internal` flag per
    topic. `test_kafka_request_is_a_single_metadata_v1_call` pins this.
-2. **The engine's PostgreSQL read-only session is interactive-only**, which is why the console is a
+2. **KRaft storage must be formatted exactly once.** Re-running `kafka-storage.sh format -t <new-uuid>`
+   against an already-formatted directory fails with
+   `Invalid cluster.id in: meta.properties. Expected …, but read …`. With a PersistentVolume the
+   broker now formats only when `meta.properties` is absent.
+3. **The demo Postgres originally had no volume**, so its seeded schema vanished on every pod
+   restart and the SQL console looked empty. Both Postgres and Kafka now persist to PVCs.
+4. **The engine's PostgreSQL read-only session is interactive-only**, which is why the console is a
    separate, opt-in, allowlisted path rather than another engine operation.
 
-
+## Reproduce everything
 
 ```bash
 ./scripts/test.sh

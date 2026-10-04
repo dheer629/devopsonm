@@ -78,11 +78,34 @@ already present in the cluster:
 | Page | Fixture |
 | --- | --- |
 | Workloads / Pods / Events / Topology | `Deployment/demo-web` (podinfo) + `Deployment/demo-postgres` |
-| Storage | `PersistentVolumeClaim/demo-data` (1Gi) and `demo-cache` (512Mi), both bound by `demo-web`, so the consuming pod is reported |
-| Network | `Service/demo-web`, `Service/postgres`, `Service/kafka` with live endpoints |
-| Database | `Service/postgres` → ready endpoint reported by `--postgres-discovery` |
-| Kafka | `Service/kafka` → reported by `--kafka-discovery`, with a `kafka.<ns>.svc:9093` bootstrap candidate |
-| PKI / TLS | `Secret/demo-tls` (`kubernetes.io/tls`, locally generated, 365 days) |
+| Storage | `demo-data` (1Gi) and `demo-cache` (512Mi) bound by `demo-web`, plus `demo-postgres-data` (2Gi) and `demo-kafka-data` (2Gi) — every PVC reports its consuming pod |
+| Network | `Service/demo-web`, `Service/postgres`, `Service/kafka` with live endpoints, plus NodePorts `30432` (PostgreSQL) and `30092` (Kafka) |
+| Database | `Service/postgres` → ready endpoint from `--postgres-discovery`, and a **real seeded schema**: `demo_customers` (10), `demo_orders` (60), `demo_events` (60) and the view `v_customer_value` |
+| Kafka | a real single-node **Kafka 3.9.1 (KRaft)** broker with topics `orders`, `payments`, `events` (3 partitions each), 25 records per topic and the `demo-reader` consumer group with committed offsets |
+| PKI / TLS | `Secret/demo-tls` (locally generated, 365 days) plus a cert-manager-issued `demo-certman-tls` when cert-manager is installed |
+
+PostgreSQL and Kafka both write to PersistentVolumes, so the seeded schema, topics
+and offsets survive a pod or cluster restart. Re-seed at any time with:
+
+```bash
+scripts/seed-demo-data.sh default     # drops and recreates the demo schema
+```
+
+## Optional client tools (`psql`, Kafka CLI)
+
+The Doctor page reports `psql`, `kafka-topics.sh`, `kafka-topics`,
+`kafka-consumer-groups.sh` and `kafka-consumer-groups` when they are missing. They are only
+needed for the engine's *interactive* checks and for hands-on verification — the app itself
+never requires them. Install them into `~/.local` **without sudo**:
+
+```bash
+scripts/install-cli-tools.sh              # both
+scripts/install-cli-tools.sh --psql-only  # PostgreSQL client only
+```
+
+It unpacks the distro's PostgreSQL client `.deb` files (no root needed), downloads a Temurin JDK
+and the Apache Kafka CLI, and writes thin wrappers into `~/.local/bin` — which is on `PATH` on
+most distros. Restart the backend afterwards so the engine picks them up.
 
 `pvc <namespace> <name>` creates a standalone PVC anywhere. The `local-path` provisioner binds on
 first consumer, so a PVC with no consuming pod stays `Pending` — which the Storage page reports as
