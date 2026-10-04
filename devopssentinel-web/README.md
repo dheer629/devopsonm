@@ -135,6 +135,19 @@ The demo fixtures are exposed for exactly this: **PostgreSQL at `<node-ip>:30432
 (3 partitions each). The full contract — including what the allowlist does *not* protect against —
 is in [`docs/SECURITY.md` §2a](docs/SECURITY.md).
 
+Both tabs prefill the node address the backend reports (`nodeAddress` on `/api/v1/system`, `defaultHost`
+on the two console probes), because a **NodePort answers on a node, not on `127.0.0.1`** — inside a
+vcluster only the API port is published to the host, which is why the documented `127.0.0.1:30432` /
+`127.0.0.1:30092` endpoints never answered. **Fill demo credentials** (Database) and **Use demo broker**
+(Kafka) fill the whole endpoint in one click, and both pages print the address they are using.
+
+`scripts/live-smoke.sh [namespace] [api-base]` proves the path end to end and prints what was written
+and what the API read back: it applies/seeds the fixtures, inserts a marker batch, reads it back through
+`POST /api/v1/database/query`, creates a topic, produces records, consumes them back, lists topics
+through `POST /api/v1/kafka/topics`, and re-confirms that write statements and unreachable brokers are
+rejected. It discovers the node address and the nodePort values from the cluster instead of assuming
+them, so it survives a driver that reassigns ports.
+
 ## Build
 
 ```bash
@@ -166,10 +179,11 @@ is in [`docs/SECURITY.md` §2a](docs/SECURITY.md).
 | Incident workspace (`/incidents/:id`), PRE/POST baseline comparison (`/baselines`), Exports page (`/exports`) | ✅ |
 | Doctor capability matrix, Settings, pins, history, local exports (JSON/CSV/NDJSON) | ✅ |
 | Command palette (Ctrl+K, `/`), keyboard chords (`g d`, `g p`, …) | ✅ |
-| 7 professional themes (5 dark / 2 light) + system auto, swatch picker, bubble surface language | ✅ |
+| 8 professional themes (4 dark / 4 light, incl. a Kubernetes-Dashboard palette) + system auto, swatch picker | ✅ |
 | Virtualized tables (5,000-row inventory test), status = icon + text + colour | ✅ |
+| LIVE interval that actually re-reads every cluster-facing query, plus an explicit **Refresh now** | ✅ |
 | SSE endpoints for live refresh and streamed logs | ✅ |
-| pytest (114), Vitest (18), Playwright smoke + axe (frontend-only, fixture-backed) | ✅ |
+| pytest (137), Vitest (30), Playwright smoke + axe (frontend-only, fixture-backed) | ✅ |
 | Live TLS inspection, interactive logs, DB/Kafka credential prompts | ⛔ CLI only (see parity matrix) |
 
 See **[docs/FEATURE_PARITY_MATRIX.md](docs/FEATURE_PARITY_MATRIX.md)** for the complete
@@ -178,7 +192,7 @@ per-feature accounting — there is no silent feature loss.
 ## Interface & themes
 
 A dense, calm operations surface with soft "bubble" geometry: pill navigation and controls, layered
-elevation, blurred top bar and status bar, and rounded data surfaces. Seven themes ship built in,
+elevation, blurred top bar and status bar, and rounded data surfaces. Eight themes ship built in,
 switchable from the palette icon in the top bar (or **Settings → Theme**):
 
 | Theme | Kind | Character |
@@ -190,8 +204,9 @@ switchable from the palette icon in the top bar (or **Settings → Theme**):
 | **Graphite** | light | neutral light for bright rooms |
 | **Daylight** | light | cool light with strong separation |
 | **Solarized** | light | warm low-glare paper tone |
+| **Kubernetes** | light | flat Kubernetes-Dashboard look: `#f5f5f5` page, white bordered cards, indigo chrome band |
 
-Plus **Follow system**, which resolves to Midnight/Graphite from the OS preference. The active theme
+Plus **Follow system**, which resolves to Midnight/Kubernetes from the OS preference. The active theme
 is written to `<html data-theme>` and persisted locally. Status is always **icon + text + colour**,
 so nothing depends on the palette.
 

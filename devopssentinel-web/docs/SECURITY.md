@@ -29,7 +29,7 @@ DevOpsSentinel Web runs on an operator workstation, binds to `127.0.0.1`, and ex
 | Credential persistence | Only theme/panel/table preferences are stored; never tokens, passwords, Secrets or keys | `state/AppContext.tsx` |
 | LAN exposure | 127.0.0.1 default; `--listen` requires an explicit `--token` | `devopssentinel-web` |
 | Opt-in live data | Both live-data features are **off by default**; each needs its own flag (`--enable-sql-console` / `--enable-kafka-topics`) | `config.enable_sql_console`, `config.enable_kafka_topics` |
-| Unbounded kubectl surface | `kubectl` is pinned to six read-only verb pairs (`config get-contexts`, `config current-context`, `get namespaces`, `get ns`, `top pods`, `top nodes`); everything else is rejected before a process is spawned | `services/kube.py::_ALLOWED` |
+| Unbounded kubectl surface | `kubectl` is pinned to seven read-only verb pairs (`config get-contexts`, `config current-context`, `get namespaces`, `get ns`, `get nodes`, `top pods`, `top nodes`); everything else is rejected before a process is spawned | `services/kube.py::_ALLOWED` |
 
 ### Resource-usage helpers (`services/kube.py`)
 
@@ -45,6 +45,17 @@ extra read-only calls to render the live usage charts:
 * When the Metrics API is absent the endpoints return `source=UNAVAILABLE` with the kubectl message
   as a warning; the UI renders "Metrics API unavailable" rather than an error page. Both paths are
   covered by `backend/tests/test_kube.py`.
+
+### Node-address helper (`services/kube.py`)
+
+`kubectl get nodes -o jsonpath=…InternalIP…` (one call, argv array, 15 s timeout) resolves the node
+address a **NodePort** live-data endpoint answers on. It exists because the opt-in Database and Kafka
+views used to prefill `127.0.0.1`, which never answers for a NodePort — inside a vcluster only the API
+port is published to the host, so the documented `127.0.0.1:30432` / `127.0.0.1:30092` demo endpoints
+time out. The address is reported as `nodeAddress` on `GET /api/v1/system` and as `defaultHost` on both
+console status endpoints; a cluster that reports nothing yields `""` and the browser falls back to the
+host the page was served from. `get nodes` is not a mutation verb and is pinned in `_ALLOWED`;
+`get secrets` and `get node <name>` remain rejected (`test_node_address_cannot_be_turned_into_a_mutation`).
 
 ## 2a. Opt-in live-data exceptions (read this before enabling)
 
@@ -126,14 +137,17 @@ Three independent layers enforce read-only behaviour:
    `rollout`, `drain`, `cordon`, `taint`, `exec`, `port-forward`, `reconcile`, `suspend`, `resume`,
    `install`, `upgrade`, `uninstall`.
 
-The adapter's kubectl usage is limited to three read-only invocations, each asserted in
+The adapter's kubectl usage is limited to four read-only invocations, each asserted in
 `services/kube.py::_ALLOWED`:
 
 ```
 kubectl config get-contexts -o name
 kubectl config current-context
 kubectl [--context C] get namespaces -o name
+kubectl [--context C] get nodes -o jsonpath={.items[0].status.addresses[?(@.type=="InternalIP")].address}
 ```
+
+`kubectl top pods --no-headers` / `kubectl top nodes --no-headers` are pinned in the same set (see §2).
 
 ## 5. Data handling
 

@@ -303,6 +303,7 @@ export const SYSTEM = {
   engineAvailable: true,
   bashAvailable: true,
   kubeconfig: "/home/user/.kube/config",
+  nodeAddress: "10.0.0.7",
   incidentId: null,
   debug: false,
   capabilities: { kubectl: true, jq: true, flux: true, helm: true, openssl: true, psql: false, kafka: false },
@@ -387,6 +388,7 @@ export async function installFixtures(page: Page): Promise<void> {
             driverAvailable: false,
             maxRows: 200,
             timeoutS: 15,
+            defaultHost: "10.0.0.7",
             reason: "disabled: start the backend with DSWEB_ENABLE_SQL_CONSOLE=1",
           },
           { source: "LOCAL" },
@@ -399,6 +401,7 @@ export async function installFixtures(page: Page): Promise<void> {
           {
             enabled: false,
             timeoutS: 8,
+            defaultHost: "10.0.0.7",
             reason: "disabled: start the backend with DSWEB_ENABLE_KAFKA_TOPICS=1",
           },
           { source: "LOCAL" },

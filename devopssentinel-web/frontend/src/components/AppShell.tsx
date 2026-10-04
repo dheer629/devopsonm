@@ -4,6 +4,7 @@ import { Outlet, useNavigate } from "react-router-dom";
 import { CommandPalette } from "@/components/CommandPalette";
 import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { Inspector } from "@/components/Inspector";
+import { LiveRefresher } from "@/components/LiveRefresher";
 import { Sidebar } from "@/components/Sidebar";
 import { StatusBar } from "@/components/StatusBar";
 import { TopBar } from "@/components/TopBar";
@@ -84,6 +85,7 @@ export function AppShell() {
         <Inspector />
       </div>
       <StatusBar />
+      <LiveRefresher />
       <CommandPalette open={paletteOpen} onOpenChange={setPaletteOpen} />
     </div>
   );

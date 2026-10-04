@@ -13,6 +13,16 @@ import pytest
 from app.services import kafkatool, sqltool
 
 
+def _stub_node_address(monkeypatch, value: str = "10.0.0.7") -> None:
+    """Keep the console status probes hermetic: never spawn kubectl in tests."""
+    from app.services import kube
+
+    async def fake(context: str = "") -> str:
+        return value
+
+    monkeypatch.setattr(kube, "node_address", fake)
+
+
 # --------------------------------------------------------------------------
 # SQL allowlist
 # --------------------------------------------------------------------------
@@ -93,12 +103,15 @@ def test_validate_target_accepts_a_realistic_target():
     sqltool.validate_target("172.18.0.2", 30432, "demo", "demo")
 
 
-def test_database_query_is_disabled_by_default(client):
+def test_database_query_is_disabled_by_default(client, monkeypatch):
     """The console must be inert unless the operator opts in."""
+    _stub_node_address(monkeypatch)
     status = client.get("/api/v1/database/console").json()
     assert status["data"]["enabled"] is False
     assert status["status"] == "UNAVAILABLE"
     assert "DSWEB_ENABLE_SQL_CONSOLE" in status["data"]["reason"]
+    # The prefill host is the node a NodePort endpoint answers on, not 127.0.0.1.
+    assert status["data"]["defaultHost"] == "10.0.0.7"
 
     response = client.post(
         "/api/v1/database/query",
@@ -115,10 +128,12 @@ def test_database_query_is_disabled_by_default(client):
     assert response.status_code == 403
 
 
-def test_kafka_topics_is_disabled_by_default(client):
+def test_kafka_topics_is_disabled_by_default(client, monkeypatch):
+    _stub_node_address(monkeypatch)
     status = client.get("/api/v1/kafka/console").json()
     assert status["data"]["enabled"] is False
     assert "DSWEB_ENABLE_KAFKA_TOPICS" in status["data"]["reason"]
+    assert status["data"]["defaultHost"] == "10.0.0.7"
 
     response = client.post(
         "/api/v1/kafka/topics",
@@ -126,6 +141,14 @@ def test_kafka_topics_is_disabled_by_default(client):
         headers={"Origin": "http://127.0.0.1:8765"},
     )
     assert response.status_code == 403
+
+
+def test_console_prefill_survives_a_cluster_without_a_node_address(client, monkeypatch):
+    """A cluster that reports nothing must not break the status probe."""
+    _stub_node_address(monkeypatch, "")
+    status = client.get("/api/v1/database/console").json()
+    assert status["data"]["defaultHost"] == ""
+    assert status["status"] == "UNAVAILABLE"  # still only gated by the opt-in flag
 
 
 # --------------------------------------------------------------------------

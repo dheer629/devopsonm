@@ -5,7 +5,15 @@ from __future__ import annotations
 SCOPE = {"context": "vcluster-docker_dev", "namespace": "devopsonm"}
 
 
-def test_version_and_system(client):
+def test_version_and_system(client, monkeypatch):
+    from app.services import kube
+
+    async def fake_node_address(context: str = "") -> str:
+        """Keep the probe hermetic: no kubectl is spawned during the tests."""
+        return "10.0.0.7"
+
+    monkeypatch.setattr(kube, "node_address", fake_node_address)
+
     version = client.get("/api/v1/version").json()
     assert version["mode"] == "SUPERVISION [READ ONLY]"
     assert version["apiSchema"] == "1.0"
@@ -13,6 +21,8 @@ def test_version_and_system(client):
     system = client.get("/api/v1/system", params=SCOPE).json()
     assert system["data"]["readOnly"] is True
     assert system["data"]["operations"]
+    # The opt-in live-data views prefill this instead of guessing 127.0.0.1.
+    assert system["data"]["nodeAddress"] == "10.0.0.7"
     assert system["source"] == "LOCAL"
 
 

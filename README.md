@@ -72,3 +72,11 @@ CPU/memory usage comes from two read-only `kubectl top` calls (`/api/v1/metrics/
 `/api/v1/metrics/pods`); without metrics-server the pages say so instead of failing. See
 [`devopssentinel-web/docs/SECURITY.md`](devopssentinel-web/docs/SECURITY.md).
 
+**Live refresh.** The `LIVE` selector in the top bar re-reads every cluster-facing query on the chosen
+interval (5–60 s) and stops while the tab is hidden; **Refresh now** forces one immediately. The opt-in
+read-only SQL console and Kafka topic lister prefill the node address the backend reports
+(`nodeAddress` on `/api/v1/system`), because the bundled demo PostgreSQL (`:30432`) and Kafka
+(`:30092`) are NodePorts — they answer on a node, never on `127.0.0.1`.
+`devopssentinel-web/scripts/live-smoke.sh` proves that path end to end and prints what was written and
+what the API read back.
+

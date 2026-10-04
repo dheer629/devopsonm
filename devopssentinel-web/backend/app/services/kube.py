@@ -6,6 +6,8 @@ read-only calls:
 
 * ``config get-contexts`` / ``config current-context`` -- scope pickers
 * ``get namespaces`` -- scope picker
+* ``get nodes`` -- the node InternalIP a NodePort is reachable on, so the
+  opt-in live-data views (SQL console, Kafka topics) can prefill a working host
 * ``top pods`` / ``top nodes`` -- live CPU/memory usage for the usage charts
 
 Every call is argv-array, no-shell, timeout-bounded, and listed in the parity
@@ -29,6 +31,7 @@ _ALLOWED = {
     ("config", "current-context"),
     ("get", "namespaces"),
     ("get", "ns"),
+    ("get", "nodes"),
     ("top", "pods"),
     ("top", "nodes"),
 }
@@ -244,3 +247,43 @@ async def top_nodes(context: str = "") -> list[dict]:
     if rc != 0:
         raise KubeError(err.strip() or "kubectl top nodes failed")
     return parse_top_nodes(out)
+
+
+# --------------------------------------------------------------------------
+# Node address (read-only `kubectl get nodes`)
+#
+# A NodePort is reachable on a *node* address, never on 127.0.0.1 -- which is
+# why the documented `127.0.0.1:30432` / `127.0.0.1:30092` demo endpoints do
+# not answer inside a vcluster (only the API port is published to the host).
+# The opt-in live-data views use this to prefill a host that actually works.
+# --------------------------------------------------------------------------
+
+_NODE_ADDRESS_JSONPATH = (
+    '{.items[0].status.addresses[?(@.type=="InternalIP")].address}'
+)
+
+
+def parse_node_address(output: str) -> str:
+    """Return the first InternalIP kubectl printed.
+
+    The jsonpath above emits a single bare address (or nothing at all when no
+    node advertises an InternalIP), so the parser only has to survive stray
+    whitespace and a multi-node fallback.
+    """
+    for line in (output or "").splitlines():
+        candidate = line.strip()
+        if candidate:
+            return candidate
+    return ""
+
+
+async def node_address(context: str = "") -> str:
+    """First node InternalIP, or ``""`` when the cluster reports none."""
+    args: list[str] = []
+    if context:
+        args += ["--context", validate_context(context)]
+    args += ["get", "nodes", "-o", f"jsonpath={_NODE_ADDRESS_JSONPATH}"]
+    rc, out, err = await _run(args)
+    if rc != 0:
+        raise KubeError(err.strip() or "unable to read a node address")
+    return parse_node_address(out)

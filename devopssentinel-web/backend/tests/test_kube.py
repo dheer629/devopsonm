@@ -9,6 +9,7 @@ from app.services.kube import (
     _validate,
     parse_cpu,
     parse_memory,
+    parse_node_address,
     parse_top_nodes,
     parse_top_pods,
 )
@@ -19,6 +20,8 @@ def test_allows_the_read_only_discovery_calls():
     _validate(["config", "current-context"])
     _validate(["get", "namespaces"])
     _validate(["get", "ns"])
+    # The node InternalIP that a NodePort live-data endpoint sits on.
+    _validate(["get", "nodes", "-o", "jsonpath={.items[0].status.addresses[0].address}"])
     # Resource usage is read-only too, and needed for the usage charts.
     _validate(["top", "pods", "--no-headers"])
     _validate(["top", "nodes", "--no-headers"])
@@ -115,3 +118,27 @@ def test_parse_top_ignores_malformed_lines():
     assert parse_top_pods("") == []
     assert parse_top_pods("only-a-name\n") == []
     assert parse_top_nodes("dev 140m\n") == []
+
+
+# --------------------------------------------------------------------------
+# Node address (the host a NodePort live-data endpoint answers on)
+# --------------------------------------------------------------------------
+
+def test_parse_node_address_reads_the_jsonpath_output():
+    assert parse_node_address("172.18.0.2") == "172.18.0.2"
+    assert parse_node_address("  10.0.0.7  \n") == "10.0.0.7"
+    # jsonpath prints nothing at all when no node advertises an InternalIP.
+    assert parse_node_address("") == ""
+    assert parse_node_address("\n  \n") == ""
+
+
+def test_node_address_cannot_be_turned_into_a_mutation():
+    """`get nodes` is allowed; the read-only guard still blocks everything else."""
+    _validate(["get", "nodes", "-o", "jsonpath={.items[0].metadata.name}"])
+    for bad in (
+        ["get", "nodes", "--show-labels", "delete", "node/dev"],
+        ["get", "node", "dev"],
+        ["get", "secrets"],
+    ):
+        with pytest.raises((KubeError, PermissionError)):
+            _validate(bad)

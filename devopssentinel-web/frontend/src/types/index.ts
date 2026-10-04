@@ -150,6 +150,8 @@ export interface SqlConsoleStatus {
   driverAvailable: boolean;
   maxRows: number;
   timeoutS: number;
+  /** Node address the opt-in console prefills; empty when the cluster reports none. */
+  defaultHost: string;
   reason: string;
 }
 
@@ -164,6 +166,8 @@ export interface QueryResultPayload {
 export interface KafkaConsoleStatus {
   enabled: boolean;
   timeoutS: number;
+  /** Node address the opt-in topic lister prefills; empty when the cluster reports none. */
+  defaultHost: string;
   reason: string;
 }
 
@@ -268,6 +272,8 @@ export interface SystemInfo {
   engineAvailable: boolean;
   bashAvailable: boolean;
   kubeconfig: string;
+  /** First node InternalIP -- the host a NodePort live-data endpoint answers on. */
+  nodeAddress: string;
   incidentId: string | null;
   debug: boolean;
   capabilities: Record<string, boolean>;

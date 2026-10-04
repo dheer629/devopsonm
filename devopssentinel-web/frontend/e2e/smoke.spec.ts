@@ -33,6 +33,37 @@ test("workload grid charts live CPU and memory usage", async ({ page }) => {
   await expect(page.getByText("58.000 Mi").first()).toBeVisible();
 });
 
+test("Refresh now re-reads the visible resources immediately", async ({ page }) => {
+  let reads = 0;
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname === "/api/v1/pods") reads += 1;
+  });
+
+  await page.goto("/workloads");
+  await expect(page.getByRole("heading", { name: "Workloads" })).toBeVisible();
+  const before = reads;
+
+  await page.getByRole("button", { name: "Refresh now" }).click();
+  await expect.poll(() => reads).toBeGreaterThan(before);
+});
+
+test("LIVE interval keeps the page refreshing without interaction", async ({ page }) => {
+  let reads = 0;
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname === "/api/v1/pods") reads += 1;
+  });
+
+  await page.goto("/workloads");
+  await expect(page.getByRole("heading", { name: "Workloads" })).toBeVisible();
+
+  await page.getByLabel("Live refresh interval").click();
+  await page.getByRole("option", { name: "5 sec" }).click();
+  const before = reads;
+
+  // No clicking, no navigation: the interval itself must re-read the page.
+  await expect.poll(() => reads, { timeout: 15_000 }).toBeGreaterThan(before);
+});
+
 test("breadcrumb band shows the section and current page", async ({ page }) => {
   await page.goto("/workloads");
   const crumbs = page.getByRole("navigation", { name: "Breadcrumb" });

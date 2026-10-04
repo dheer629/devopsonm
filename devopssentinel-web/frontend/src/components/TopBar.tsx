@@ -1,5 +1,6 @@
-import { Search, ShieldCheck } from "lucide-react";
-import { useEffect } from "react";
+import { useIsFetching, useQueryClient } from "@tanstack/react-query";
+import { RefreshCw, Search, ShieldCheck } from "lucide-react";
+import { useCallback, useEffect } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -23,6 +24,14 @@ export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
   const system = useSystem();
   const contexts = useContexts();
   const namespaces = useNamespaces(context);
+  const queryClient = useQueryClient();
+  const fetching = useIsFetching();
+
+  // "Refresh now": one explicit re-read of everything on screen, independent of
+  // the LIVE interval (which only covers the cluster-facing queries).
+  const refreshNow = useCallback(() => {
+    void queryClient.refetchQueries({ type: "active" });
+  }, [queryClient]);
 
   const contextList = contexts.data?.data.contexts ?? [];
   const namespaceList = namespaces.data?.data.namespaces ?? [];
@@ -105,6 +114,22 @@ export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
               </SelectContent>
             </Select>
           </div>
+        </Tooltip>
+
+        <Tooltip content="Re-read every resource on this page right now">
+          <button
+            type="button"
+            onClick={refreshNow}
+            aria-label="Refresh now"
+            className="flex h-7 items-center gap-1 rounded-full border border-border px-2 text-[11px] text-text-muted transition-colors hover:border-border-strong hover:text-text disabled:opacity-60"
+            disabled={fetching > 0}
+          >
+            <RefreshCw
+              className={fetching > 0 ? "h-3.5 w-3.5 animate-spin" : "h-3.5 w-3.5"}
+              aria-hidden="true"
+            />
+            Refresh
+          </button>
         </Tooltip>
 
         <ThemeMenu />

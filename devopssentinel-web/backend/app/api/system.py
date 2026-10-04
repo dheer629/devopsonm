@@ -20,6 +20,14 @@ router = APIRouter(prefix="/api/v1", tags=["system"])
 async def system_info(sc: Scope = Depends(scope)) -> dict:
     from ..services.evidence import list_incidents
 
+    # Best effort: the NodePort live-data endpoints (demo Postgres / Kafka) sit
+    # on a node address, so the opt-in views prefill this instead of guessing
+    # 127.0.0.1. A cluster that reports nothing simply yields "".
+    try:
+        node_address = await kube.node_address(sc.context)
+    except kube.KubeError:
+        node_address = ""
+
     return make_envelope(
         {
             "webVersion": WEB_VERSION,
@@ -30,6 +38,7 @@ async def system_info(sc: Scope = Depends(scope)) -> dict:
             "engineAvailable": settings.engine_available(),
             "bashAvailable": settings.bash_available(),
             "kubeconfig": kube.kubeconfig_path(),
+            "nodeAddress": node_address,
             "incidentId": settings.incident_id,
             "debug": settings.debug,
             "capabilities": kube.capabilities(),

@@ -1,19 +1,12 @@
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import { useRunQuery, useSqlConsole } from "@/api/queries";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { DEMO_DATABASE, DEMO_DATABASE_PORT, resolveLiveHost } from "@/lib/live";
 import type { QueryResultPayload } from "@/types";
-
-/** The bundled demo fixtures, so the console is one click from working. */
-const DEMO = {
-  port: "30432",
-  database: "demo",
-  username: "demo",
-  password: "demo-not-a-real-credential",
-};
 
 const DEFAULT_SQL =
   "select table_schema, table_name\nfrom information_schema.tables\norder by 1, 2\nlimit 50";
@@ -23,20 +16,42 @@ const DEFAULT_SQL =
  *  Disabled unless the backend runs with `DSWEB_ENABLE_SQL_CONSOLE=1`. The
  *  credentials typed here live only in this component's state and in one request
  *  body; the backend never stores, logs or audits them.
+ *
+ *  The host prefills with the node address the backend reports, because the
+ *  bundled demo endpoint is a NodePort: it answers on a *node*, never on
+ *  `127.0.0.1` (inside a vcluster only the API port is published to the host).
  */
 export function SqlConsole() {
   const status = useSqlConsole();
   const run = useRunQuery();
 
-  const [host, setHost] = useState(() => window.location.hostname || "127.0.0.1");
-  const [port, setPort] = useState(DEMO.port);
-  const [database, setDatabase] = useState(DEMO.database);
-  const [username, setUsername] = useState(DEMO.username);
+  const suggestedHost = resolveLiveHost(status.data?.data.defaultHost, window.location.hostname);
+
+  const [host, setHost] = useState(suggestedHost);
+  const [hostTouched, setHostTouched] = useState(false);
+  const [port, setPort] = useState(DEMO_DATABASE_PORT);
+  const [database, setDatabase] = useState(DEMO_DATABASE.name);
+  const [username, setUsername] = useState(DEMO_DATABASE.username);
   const [password, setPassword] = useState("");
   const [sql, setSql] = useState(DEFAULT_SQL);
 
+  // The node address arrives with the console status; adopt it until the
+  // operator types a host of their own.
+  useEffect(() => {
+    if (!hostTouched) setHost(suggestedHost);
+  }, [hostTouched, suggestedHost]);
+
   const enabled = Boolean(status.data?.data.enabled && status.data?.data.driverAvailable);
   const result = run.data?.data;
+
+  const fillDemo = () => {
+    setHost(suggestedHost);
+    setHostTouched(false);
+    setPort(DEMO_DATABASE_PORT);
+    setDatabase(DEMO_DATABASE.name);
+    setUsername(DEMO_DATABASE.username);
+    setPassword(DEMO_DATABASE.password);
+  };
 
   return (
     <div className="space-y-3">
@@ -57,12 +72,27 @@ export function SqlConsole() {
             one read-only statement is accepted (SELECT / WITH / SHOW / EXPLAIN / TABLE / VALUES /
             &#92;d) and the session is forced read-only on the server, so it cannot mutate data.
           </p>
+          <p className="text-[11.5px] text-text-faint">
+            Host prefills with the cluster node address
+            {status.data?.data.defaultHost ? (
+              <>
+                {" "}
+                (<span className="mono">{status.data.data.defaultHost}</span>)
+              </>
+            ) : null}
+            , because a NodePort answers on a node — not on <span className="mono">127.0.0.1</span>.
+            The bundled demo database is <span className="mono">{suggestedHost}:{DEMO_DATABASE_PORT}</span>{" "}
+            (user/db/password <span className="mono">demo</span>).
+          </p>
           <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-5">
             <Field label="Host">
               <Input
                 aria-label="Database host"
                 value={host}
-                onChange={(event) => setHost(event.target.value)}
+                onChange={(event) => {
+                  setHostTouched(true);
+                  setHost(event.target.value);
+                }}
               />
             </Field>
             <Field label="Port">
@@ -125,17 +155,7 @@ export function SqlConsole() {
             >
               Run read-only query
             </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => {
-                setHost(window.location.hostname || "127.0.0.1");
-                setPort(DEMO.port);
-                setDatabase(DEMO.database);
-                setUsername(DEMO.username);
-                setPassword(DEMO.password);
-              }}
-            >
+            <Button variant="outline" size="sm" onClick={fillDemo}>
               Fill demo credentials
             </Button>
             {run.isPending ? <span className="text-[11.5px] text-text-muted">running…</span> : null}

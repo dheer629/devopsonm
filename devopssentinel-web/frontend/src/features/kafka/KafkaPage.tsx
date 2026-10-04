@@ -1,5 +1,5 @@
 import type { ColumnDef } from "@tanstack/react-table";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 import {
   useKafka,
@@ -26,6 +26,7 @@ import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { reportText } from "@/lib/format";
+import { DEMO_KAFKA_PORT, resolveLiveHost } from "@/lib/live";
 import { useApp } from "@/state/AppContext";
 import type { KafkaServiceResource } from "@/types";
 
@@ -69,10 +70,27 @@ export function KafkaPage() {
 
   const consoleStatus = useKafkaConsole();
   const listTopics = useListTopics();
-  const [brokerHost, setBrokerHost] = useState(() => window.location.hostname || "127.0.0.1");
-  const [brokerPort, setBrokerPort] = useState("30092");
+  const suggestedHost = resolveLiveHost(
+    consoleStatus.data?.data.defaultHost,
+    window.location.hostname,
+  );
+  const [brokerHost, setBrokerHost] = useState(suggestedHost);
+  const [hostTouched, setHostTouched] = useState(false);
+  const [brokerPort, setBrokerPort] = useState(DEMO_KAFKA_PORT);
   const topicsEnabled = Boolean(consoleStatus.data?.data.enabled);
   const listing = listTopics.data?.data;
+
+  // The node address arrives with the console status; adopt it until the
+  // operator types a bootstrap host of their own.
+  useEffect(() => {
+    if (!hostTouched) setBrokerHost(suggestedHost);
+  }, [hostTouched, suggestedHost]);
+
+  const useDemoBroker = () => {
+    setBrokerHost(suggestedHost);
+    setHostTouched(false);
+    setBrokerPort(DEMO_KAFKA_PORT);
+  };
 
   const columns = useMemo<ColumnDef<KafkaServiceResource, unknown>[]>(
     () => [
@@ -151,7 +169,13 @@ export function KafkaPage() {
                 No Kafka broker Service was reported in{" "}
                 <span className="mono">{scope.namespace || "this namespace"}</span>, so there are no
                 topics to list. Services whose name or labels contain <span className="mono">kafka</span>{" "}
-                are reported.
+                are reported. The bundled demo broker lives in namespace{" "}
+                <span className="mono">default</span> — switch the namespace picker, or point the{" "}
+                <span className="mono">Topics</span> tab at{" "}
+                <span className="mono">
+                  {suggestedHost}:{DEMO_KAFKA_PORT}
+                </span>
+                .
               </p>
             ) : null}
             <p className="text-[11.5px] text-text-muted">
@@ -229,7 +253,10 @@ export function KafkaPage() {
                       aria-label="Bootstrap host"
                       className="mt-1 w-[220px]"
                       value={brokerHost}
-                      onChange={(event) => setBrokerHost(event.target.value)}
+                      onChange={(event) => {
+                        setHostTouched(true);
+                        setBrokerHost(event.target.value);
+                      }}
                     />
                   </label>
                   <label className="block">
@@ -251,13 +278,21 @@ export function KafkaPage() {
                   >
                     List topics
                   </Button>
+                  <Button variant="outline" size="sm" onClick={useDemoBroker}>
+                    Use demo broker
+                  </Button>
                   {listTopics.isPending ? (
                     <span className="text-[11.5px] text-text-muted">asking the broker…</span>
                   ) : null}
                 </div>
                 <p className="text-[11px] text-text-faint">
-                  The bundled demo broker is exposed at{" "}
-                  <span className="mono">{window.location.hostname || "127.0.0.1"}:30092</span>.
+                  Host prefills with the cluster node address, because the bundled demo broker is a
+                  NodePort and answers on a node — not on <span className="mono">127.0.0.1</span>. The
+                  demo endpoint is{" "}
+                  <span className="mono">
+                    {suggestedHost}:{DEMO_KAFKA_PORT}
+                  </span>{" "}
+                  (namespace <span className="mono">default</span>).
                 </p>
                 {listTopics.isError ? (
                   <p className="text-[12px] text-critical">{(listTopics.error as Error).message}</p>

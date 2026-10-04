@@ -10,12 +10,12 @@ from __future__ import annotations
 
 import dataclasses
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel, Field
 
 from ..config import settings
 from ..models import make_envelope
-from ..services import kafkatool, sqltool
+from ..services import kafkatool, kube, sqltool
 
 router = APIRouter(prefix="/api/v1", tags=["live"])
 
@@ -28,8 +28,22 @@ def _pg_driver_available() -> bool:
     return True
 
 
+async def _node_address(context: str) -> str:
+    """Best-effort node InternalIP, so the console can prefill a live host.
+
+    A NodePort is reachable on a node address, not on 127.0.0.1 -- inside a
+    vcluster only the API port is published to the host. When the cluster
+    reports nothing the field stays empty and the browser falls back to its own
+    hostname.
+    """
+    try:
+        return await kube.node_address(context)
+    except kube.KubeError:
+        return ""
+
+
 @router.get("/database/console")
-async def database_console() -> dict:
+async def database_console(context: str = Query("")) -> dict:
     """Report whether the read-only SQL console can be used."""
     enabled = settings.enable_sql_console
     driver = _pg_driver_available()
@@ -44,6 +58,7 @@ async def database_console() -> dict:
             "driverAvailable": driver,
             "maxRows": settings.sql_max_rows,
             "timeoutS": settings.sql_timeout_s,
+            "defaultHost": await _node_address(context),
             "reason": reason,
         },
         source="LOCAL",
@@ -96,7 +111,7 @@ async def database_query(payload: QueryRequest) -> dict:
 
 
 @router.get("/kafka/console")
-async def kafka_console() -> dict:
+async def kafka_console(context: str = Query("")) -> dict:
     """Report whether Kafka topic listing can be used."""
     enabled = settings.enable_kafka_topics
     reason = "" if enabled else "disabled: start the backend with DSWEB_ENABLE_KAFKA_TOPICS=1"
@@ -104,6 +119,7 @@ async def kafka_console() -> dict:
         {
             "enabled": enabled,
             "timeoutS": settings.kafka_timeout_s,
+            "defaultHost": await _node_address(context),
             "reason": reason,
         },
         source="LOCAL",

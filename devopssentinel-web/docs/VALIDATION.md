@@ -7,13 +7,14 @@ frontend served from the production `dist/` build.
 
 | Layer | Command | Result |
 | --- | --- | --- |
-| Backend unit + API contract | `python -m pytest -q` | **134 passed** |
+| Backend unit + API contract | `python -m pytest -q` | **137 passed** |
 | Frontend typecheck (strict) | `cd frontend && npm run typecheck` | **clean** |
-| Frontend unit | `cd frontend && npx vitest run` | **25 passed** (5 files) |
-| Frontend production build | `cd frontend && npm run build` | **built** (905 kB JS / 54 kB CSS; 276 kB / 10 kB gzip) |
-| Browser E2E (dark + light) | `cd frontend && npx playwright test` | **72 passed** (36 tests × 2 themes) |
+| Frontend unit | `cd frontend && npx vitest run` | **30 passed** (6 files) |
+| Frontend production build | `cd frontend && npm run build` | **built** (907 kB JS / 54.6 kB CSS; 277 kB / 10.3 kB gzip) |
+| Browser E2E (dark + light) | `cd frontend && npx playwright test` | **76 passed** (38 tests × 2 themes) |
+| Live refresh | `LIVE` interval + **Refresh now** in the top bar | **4 passed** — a 5 s tick re-reads `/api/v1/pods` with no interaction, in both themes |
 | Accessibility (axe) | `cd frontend && npx playwright test e2e/a11y.spec.ts` | **24 passed** (12 routes × 2 themes) |
-| Opt-in live data (real DB + broker) | `scripts/demo-resources.sh up default` then the SQL/Topics tabs | **verified** — see *Opt-in live data validation* |
+| Opt-in live data (real DB + broker) | `scripts/live-smoke.sh default` | **PASSED** — see *Opt-in live data validation* |
 | Live usage metrics (real cluster) | `curl /api/v1/metrics/nodes` + `/metrics/pods` against the dev vcluster | **LIVE** — node `dev` 205 m / 2.02 GiB (25 %); per-pod CPU/memory for the three demo pods |
 | Live server smoke | `uvicorn app.main:app` + HTTP checks | `/api/v1/version` 200, `/api/v1/system` 200, `/` and `/workloads` 200, fail-safe operation returns `UNAVAILABLE` envelope (not 500) |
 
@@ -29,6 +30,8 @@ frontend served from the production `dist/` build.
 | The generic `/pods` fixture rule shadowed `/metrics/pods` and returned the wrong envelope shape → the Workloads page threw and unmounted | Playwright (blank page + 30 s click timeout) | metrics routes matched first + defensive optional chaining on the metrics payload |
 | The Memory (bytes) column was **silently clipped** (no overflow, so no scrollbar) at 9 columns | measuring `scrollWidth` vs `clientWidth` on the table region | `min-w-full` on the table + `shrink-0` on the usage label |
 | New theme default was a fixed light palette, so both Playwright projects rendered the same theme | reviewing which theme each project actually exercised | default is now `system`, so `desktop-dark` tests midnight and `desktop-light` tests the light palette |
+| The `LIVE` interval was **decorative**: `live`/`liveActive` were read only by the status bar, so no query ever set `refetchInterval` and nothing refreshed | tracing the selector through `AppContext` | a `LiveRefresher` component re-reads every active cluster-facing query on the tick (`refetchQueries` deliberately bypasses `staleTime`), plus an explicit **Refresh now** button; two Playwright tests pin both paths in both themes |
+| The SQL console and the Kafka topic lister prefilled `127.0.0.1`, which **never answers for a NodePort** — both timed out (`Connection refused` / 15 s timeout) inside the vcluster | user report (`/database`, `/kafka`) | the backend reports the node InternalIP as `nodeAddress` on `/system` and `defaultHost` on both console probes (one read-only `kubectl get nodes`); both views prefill it and print the reachable endpoint |
 
 ## What the backend suite proves
 
@@ -149,12 +152,14 @@ PersistentVolumes and exposed with NodePorts so the local adapter can reach them
 | Chained statements are rejected | `select 1; delete from public.demo_orders` | **400** `only one statement per request is allowed` |
 | Literals are not mistaken for SQL | `select '; drop table x' as sneaky` | **200** — the literal is returned as data |
 | Unreachable broker is reported, not hidden | `POST /api/v1/kafka/topics` on port 39999 | **400** `cannot reach the broker: [Errno 111] Connection refused` |
+| Reachable endpoint is reported, not guessed | `GET /api/v1/database/console`, `/kafka/console` | `defaultHost: "172.18.0.2"` on both — the node the demo NodePorts answer on |
+| Live end-to-end report | `scripts/live-smoke.sh default` | **PASSED** — applies/seeds the fixtures, inserts a 7-row marker batch, reads it back through the API (`SKU-sentinel-smoke-01` → 7 rows / 98.00), creates a marker topic, produces 5 records, consumes 3 back, lists it through the API and re-confirms the read-only guard |
 | Doctor capability grid | `GET /api/v1/system` | **all 9 AVAILABLE**: engine, bash, kubectl, jq, openssl, flux, helm, psql, kafka |
 | Doctor engine capability report | `GET /api/v1/doctor` | `psql`, `kafka-topics.sh`, `kafka-topics`, `kafka-consumer-groups.sh`, `kafka-consumer-groups`, API discovery, Flux CRDs, cert-manager CRDs and Metrics API all **AVAILABLE** |
 | PKI includes a cert-manager certificate | `GET /api/v1/certificates` | `demo-certman-tls` (cert-manager, 89 days) and `demo-tls` (364 days), both `OK` |
 | Storage reports consumers | `GET /api/v1/storage` | 4 Bound PVCs, each with its consuming pod |
 
-Four protocol/environment details cost real debugging time and are worth recording:
+Five protocol/environment details cost real debugging time and are worth recording:
 
 1. **Kafka 3.9 removed Metadata v0** (KIP-896). A version-0 request is accepted at the TCP level and
    then closed with no response; the adapter must ask for **version 1**, whose response adds a
@@ -168,6 +173,12 @@ Four protocol/environment details cost real debugging time and are worth recordi
    restart and the SQL console looked empty. Both Postgres and Kafka now persist to PVCs.
 4. **The engine's PostgreSQL read-only session is interactive-only**, which is why the console is a
    separate, opt-in, allowlisted path rather than another engine operation.
+5. **The demo endpoints are NodePorts, so they answer on a *node* — never on `127.0.0.1`.** Both views
+   prefilled `window.location.hostname`, which can never work inside a vcluster because only the API
+   port is published to the host. They now prefill the node InternalIP that `GET /api/v1/system`
+   reports as `nodeAddress`, and both pages print the reachable `<node>:30432` / `<node>:30092`
+   endpoint. `scripts/live-smoke.sh` discovers the node and the nodePort values rather than assuming
+   them, so it keeps working when the driver assigns different ports.
 
 ## Reproduce everything
 
