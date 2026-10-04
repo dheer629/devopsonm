@@ -28,7 +28,7 @@ DevOpsSentinel Web runs on an operator workstation, binds to `127.0.0.1`, and ex
 | Unbounded work | Per-operation timeouts (≤ 300 s), output cap (8 MB), child termination, TTL cache + single-flight | `config`, `runner`, `cache` |
 | Credential persistence | Only theme/panel/table preferences are stored; never tokens, passwords, Secrets or keys | `state/AppContext.tsx` |
 | LAN exposure | 127.0.0.1 default; `--listen` requires an explicit `--token` | `devopssentinel-web` |
-| Opt-in live data | Both live-data features are **off by default** and each has its own flag | `config.enable_sql_console`, `config.enable_kafka_topics` |
+| Opt-in live data | Both live-data features are **off by default**; each needs its own flag (`--enable-sql-console` / `--enable-kafka-topics`) | `config.enable_sql_console`, `config.enable_kafka_topics` |
 
 ## 2a. Opt-in live-data exceptions (read this before enabling)
 

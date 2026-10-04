@@ -20,6 +20,8 @@ INCIDENT=""
 CONTEXT=""
 NAMESPACE=""
 TOKEN=""
+SQL_CONSOLE="${DSWEB_ENABLE_SQL_CONSOLE:-0}"
+KAFKA_TOPICS="${DSWEB_ENABLE_KAFKA_TOPICS:-0}"
 PYTHON_BIN="${PYTHON:-}"
 
 usage() {
@@ -39,7 +41,13 @@ Options:
   --host H          Bind address (default 127.0.0.1)
   --listen H        Explicit non-local bind; requires --token
   --token TOKEN     Access token required when binding beyond 127.0.0.1
+  --enable-sql-console    Enable the opt-in read-only SQL console (/database -> SQL)
+  --enable-kafka-topics   Enable opt-in live Kafka topic listing (/kafka -> Topics)
   -h, --help        Show this help
+
+Both opt-in features are OFF by default and each requires an explicit flag.
+They are the only code paths that talk to something other than the engine;
+read docs/SECURITY.md section 2a before enabling them.
 
 The engine (DevOps_K8s_Sentinel_FINAL_GP.sh) is the operational source of
 truth. This launcher never mutates the cluster and never requires sudo.
@@ -58,6 +66,8 @@ while (($#)); do
         --host) HOST="${2:-127.0.0.1}"; shift ;;
         --listen) HOST="${2:-0.0.0.0}"; shift ;;
         --token) TOKEN="${2:-}"; shift ;;
+        --enable-sql-console) SQL_CONSOLE=1 ;;
+        --enable-kafka-topics) KAFKA_TOPICS=1 ;;
         -h|--help) usage; exit 0 ;;
         *) printf 'Unknown option: %s\n' "$1" >&2; usage; exit 2 ;;
     esac
@@ -115,11 +125,19 @@ printf '%-12s %-14s %s\n' 'Kubernetes' '' "$KUBERNETES_STATE"
 printf '%-12s %-14s %s\n' 'Context' '' "${CONTEXT:-none}"
 printf '%-12s %-14s %s\n' 'Namespace' '' "${NAMESPACE:-all}"
 printf '%-12s %-14s %s\n' 'Mode' '' 'SUPERVISION [READ ONLY]'
+LIVE_DATA="OFF"
+if [[ "$SQL_CONSOLE" == "1" && "$KAFKA_TOPICS" == "1" ]]; then LIVE_DATA="SQL console + Kafka topics"
+elif [[ "$SQL_CONSOLE" == "1" ]]; then LIVE_DATA="SQL console"
+elif [[ "$KAFKA_TOPICS" == "1" ]]; then LIVE_DATA="Kafka topics"
+fi
+printf '%-12s %-14s %s\n' 'Live data' '' "$LIVE_DATA"
 printf '\nOpen:\nhttp://%s:%s\n\n' "$HOST" "$PORT"
 
 export DSWEB_HOST="$HOST"
 export DSWEB_PORT="$PORT"
 export DSWEB_DEBUG="$DEBUG"
+export DSWEB_ENABLE_SQL_CONSOLE="$SQL_CONSOLE"
+export DSWEB_ENABLE_KAFKA_TOPICS="$KAFKA_TOPICS"
 export PYTHONPATH="$SCRIPT_DIR/backend${PYTHONPATH:+:$PYTHONPATH}"
 [[ -n "$INCIDENT" ]] && export DSWEB_INCIDENT_ID="$INCIDENT"
 [[ -n "$TOKEN" ]] && export DSWEB_ACCESS_TOKEN="$TOKEN"

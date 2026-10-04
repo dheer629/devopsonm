@@ -97,6 +97,8 @@ Both are **off by default**. The browser stays a pure read-only supervision surf
 explicitly enable them:
 
 ```bash
+./devopssentinel-web --enable-sql-console --enable-kafka-topics
+# or, equivalently, with environment variables:
 DSWEB_ENABLE_SQL_CONSOLE=1 DSWEB_ENABLE_KAFKA_TOPICS=1 ./devopssentinel-web
 ```
 
