@@ -12,6 +12,9 @@ interface Row {
   version: string;
 }
 
+const KNOWN_STATUS =
+  /^(AVAILABLE|UNAVAILABLE|NOT INSTALLED|OPTIONAL\/UNAVAILABLE|OPTIONAL|OK|READY|MISSING|NOT PROBED)$/;
+
 export function DoctorPage() {
   const { scope } = useApp();
   const doctor = useDoctor(scope);
@@ -25,7 +28,10 @@ export function DoctorPage() {
       if (cells.length < 2) continue;
       const [name, status, version = ""] = cells;
       if (!name || !status) continue;
-      parsed.push({ name, status, version });
+      // Only real capability rows; header/banner lines are ignored.
+      if (!KNOWN_STATUS.test(status.toUpperCase())) continue;
+      if (name.length > 40 || name.includes(":")) continue;
+      parsed.push({ name, status: status.toUpperCase(), version });
     }
     return parsed;
   }, [doctor.data]);

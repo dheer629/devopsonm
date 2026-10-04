@@ -14,6 +14,7 @@ import {
   StatusPill,
 } from "@/components/common";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { severityRank } from "@/lib/status";
@@ -30,7 +31,7 @@ const KINDS = [
 ];
 
 export function GitOpsPage() {
-  const { scope, setSelection } = useApp();
+  const { scope, setSelection, setNamespace } = useApp();
   const gitops = useGitOps(scope);
   const graph = useGitOpsGraph(scope);
   const [kind, setKind] = useState("ALL");
@@ -95,6 +96,8 @@ export function GitOpsPage() {
       ? rawChain
       : { nodes: [], edges: [] };
 
+  const elsewhere = scope.namespace !== "flux-system";
+
   return (
     <div className="space-y-3">
       <PageHeader
@@ -102,13 +105,29 @@ export function GitOpsPage() {
         subtitle={
           <>
             {summary.ready} / {summary.total} ready · {summary.failed} failed · {summary.suspended}{" "}
-            suspended
+            suspended · namespace <span className="mono">{scope.namespace || "—"}</span>
           </>
         }
         actions={gitops.data ? <Freshness envelope={gitops.data.envelope} /> : null}
       />
 
       {gitops.data ? <PartialBanner envelope={gitops.data.envelope} /> : null}
+
+      {!gitops.isLoading && summary.total === 0 && elsewhere ? (
+        <Card>
+          <CardBody className="flex flex-wrap items-center gap-3">
+            <Badge tone="warning">NO FLUX OBJECTS HERE</Badge>
+            <span className="text-[12.5px] text-text-muted">
+              Nothing was reported in{" "}
+              <span className="mono">{scope.namespace || "this namespace"}</span>. Flux objects
+              usually live in <span className="mono">flux-system</span>.
+            </span>
+            <Button variant="soft" size="sm" onClick={() => setNamespace("flux-system")}>
+              Switch to flux-system
+            </Button>
+          </CardBody>
+        </Card>
+      ) : null}
 
       <Card>
         <CardHeader>

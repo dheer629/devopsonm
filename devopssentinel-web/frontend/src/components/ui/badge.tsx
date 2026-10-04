@@ -4,7 +4,7 @@ import type { HTMLAttributes } from "react";
 import { cn } from "@/lib/utils";
 
 const badgeVariants = cva(
-  "inline-flex items-center gap-1 rounded border px-1.5 py-0.5 text-[11px] font-medium leading-4",
+  "inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10.5px] font-semibold leading-4 tracking-wide",
   {
     variants: {
       tone: {
@@ -14,6 +14,7 @@ const badgeVariants = cva(
         critical: "border-critical/40 text-critical bg-critical/10",
         info: "border-info/40 text-info bg-info/10",
         unknown: "border-border-strong text-unknown bg-panel-2",
+        accent: "border-accent/40 text-accent bg-accent-soft",
         kubernetes: "border-kubernetes/40 text-kubernetes bg-kubernetes/10",
         gitops: "border-gitops/40 text-gitops bg-gitops/10",
         pki: "border-pki/40 text-pki bg-pki/10",

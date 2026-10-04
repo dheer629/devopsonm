@@ -14,7 +14,7 @@ export const SelectTrigger = forwardRef<
   <SelectPrimitive.Trigger
     ref={ref}
     className={cn(
-      "inline-flex h-8 w-full items-center justify-between gap-2 rounded-md border border-border bg-bg-elevated px-2 text-[12.5px] text-text hover:border-border-strong",
+      "inline-flex h-8 w-full items-center justify-between gap-2 rounded-full border border-border bg-bg-elevated px-3 text-[12.5px] text-text transition-colors hover:border-border-strong",
       className,
     )}
     {...props}
@@ -36,12 +36,12 @@ export const SelectContent = forwardRef<
       ref={ref}
       position={position}
       className={cn(
-        "z-50 max-h-80 min-w-[8rem] overflow-hidden rounded-md border border-border bg-bg-elevated shadow-xl",
+        "surface-raised z-50 max-h-80 min-w-[8rem] overflow-hidden p-1.5",
         className,
       )}
       {...props}
     >
-      <SelectPrimitive.Viewport className="p-1">{children}</SelectPrimitive.Viewport>
+      <SelectPrimitive.Viewport>{children}</SelectPrimitive.Viewport>
     </SelectPrimitive.Content>
   </SelectPrimitive.Portal>
 ));
@@ -54,7 +54,7 @@ export const SelectItem = forwardRef<
   <SelectPrimitive.Item
     ref={ref}
     className={cn(
-      "relative flex cursor-pointer select-none items-center rounded px-2 py-1.5 pr-7 text-[12.5px] text-text outline-none data-[highlighted]:bg-panel-2",
+      "relative flex cursor-pointer select-none items-center rounded-xl px-2.5 py-1.5 pr-7 text-[12.5px] text-text outline-none data-[highlighted]:bg-panel-2",
       className,
     )}
     {...props}

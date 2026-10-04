@@ -11,7 +11,7 @@ frontend served from the production `dist/` build.
 | Frontend typecheck (strict) | `cd frontend && npm run typecheck` | **clean** |
 | Frontend unit | `cd frontend && npx vitest run` | **18 passed** (4 files) |
 | Frontend production build | `cd frontend && npm run build` | **built** (840 kB JS / 43 kB CSS; 261 kB / 8 kB gzip) |
-| Browser E2E (dark + light) | `cd frontend && npx playwright test` | **58 passed** (29 tests × 2 themes) |
+| Browser E2E (dark + light) | `cd frontend && npx playwright test` | **62 passed** (31 tests × 2 themes) |
 | Accessibility (axe) | `cd frontend && npx playwright test e2e/a11y.spec.ts` | **20 passed** (10 routes × 2 themes) |
 | Live server smoke | `uvicorn app.main:app` + HTTP checks | `/api/v1/version` 200, `/api/v1/system` 200, `/` and `/workloads` 200, fail-safe operation returns `UNAVAILABLE` envelope (not 500) |
 
@@ -89,6 +89,10 @@ Real captured formats that the parsers were aligned to:
 | Pods table invented its own restart threshold, contradicting the engine's triage | live comparison | readiness drives pod status; restart counts stay a column and findings come from the engine |
 | First run showed an empty context selector | live browser check | the UI adopts the kubeconfig's current context automatically |
 | `pydantic-settings` was not in the WSL dependency set | live start | added to `requirements.txt` install step |
+| Topology demanded a typed resource name, so the page looked broken | live browser check | resource picker is populated from the cluster and auto-selects the first object; one-click GitOps-chain toggle |
+| Themes had no default palette at first paint (`:root` lost its variables when per-theme classes were added) | axe flagged `color-contrast` on `/workloads` | Midnight is now the `:root` default and `index.html` ships `class="theme-midnight dark"` |
+| Doctor table listed banner lines as capabilities | live doctor output | rows are filtered to known status tokens |
+| Empty GitOps in a non-Flux namespace looked broken | live browser check | explicit hint plus a one-click switch to `flux-system` |
 
 ### Environment notes (not application defects)
 

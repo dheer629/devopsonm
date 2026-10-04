@@ -7,10 +7,19 @@ import {
   type Node,
 } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
-import { useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
+import { Waypoints } from "lucide-react";
 
-import { useGitOpsGraph, useGraph } from "@/api/queries";
+import {
+  useCertificates,
+  useGitOps,
+  useGitOpsGraph,
+  useGraph,
+  usePods,
+  useServices,
+  useWorkloads,
+} from "@/api/queries";
 import {
   EmptyState,
   ErrorState,
@@ -20,6 +29,7 @@ import {
   PartialBanner,
 } from "@/components/common";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardBody } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import {
@@ -125,6 +135,7 @@ function toFlow(graph: Graph, depth: number, rootId: string): { nodes: Node[]; e
 
 export function TopologyPage() {
   const { scope, setSelection } = useApp();
+  const navigate = useNavigate();
   const [params] = useSearchParams();
   const isGitOpsGraph = params.get("graph") === "gitops";
 
@@ -135,6 +146,51 @@ export function TopologyPage() {
   const [hideHealthy, setHideHealthy] = useState(false);
   const [failureOnly, setFailureOnly] = useState(false);
   const [search, setSearch] = useState("");
+
+  // Discover selectable resources from the cluster instead of asking the
+  // operator to type an identifier from memory.
+  const enabled = !isGitOpsGraph;
+  const podList = usePods(scope, enabled);
+  const serviceList = useServices(scope, enabled);
+  const workloadList = useWorkloads(scope, enabled);
+  const gitopsList = useGitOps(scope, enabled);
+  const certList = useCertificates(scope, enabled);
+
+  const options = useMemo<string[]>(() => {
+    switch (kind) {
+      case "Pod":
+        return (podList.data?.envelope.data ?? []).map((item) => item.name);
+      case "Service":
+        return (serviceList.data?.envelope.data ?? []).map((item) => item.name);
+      case "Deployment":
+      case "StatefulSet":
+      case "DaemonSet":
+        return (workloadList.data?.envelope.data ?? [])
+          .filter((item) => item.kind === kind)
+          .map((item) => item.name);
+      case "GitRepository":
+      case "Kustomization":
+      case "HelmRelease":
+        return (gitopsList.data?.envelope.data ?? [])
+          .filter((item) => item.kind === kind)
+          .map((item) => item.name);
+      case "Secret":
+        return (certList.data?.envelope.data ?? []).map((item) => item.name);
+      default:
+        return [];
+    }
+  }, [kind, podList.data, serviceList.data, workloadList.data, gitopsList.data, certList.data]);
+
+  const loadingOptions =
+    podList.isLoading || serviceList.isLoading || workloadList.isLoading || gitopsList.isLoading;
+
+  // Auto-select the first discovered resource so the graph is never empty
+  // when the cluster actually has objects of the chosen kind.
+  useEffect(() => {
+    if (isGitOpsGraph) return;
+    if (name && options.includes(name)) return;
+    if (options.length > 0) setName(options[0]);
+  }, [options, name, isGitOpsGraph]);
 
   const dependency = useGraph(scope, kind, name, !isGitOpsGraph && Boolean(name));
   const gitops = useGitOpsGraph(scope, isGitOpsGraph);
@@ -195,13 +251,30 @@ export function TopologyPage() {
               ))}
             </SelectContent>
           </Select>
-          <Input
-            value={name}
-            onChange={(event) => setName(event.target.value)}
-            placeholder="resource name"
-            className="w-56"
-            aria-label="Resource name"
-          />
+          {isGitOpsGraph ? (
+            <Badge tone="gitops">GitOps chain graph</Badge>
+          ) : options.length > 0 ? (
+            <Select value={name} onValueChange={setName}>
+              <SelectTrigger className="w-64" aria-label="Resource name">
+                <SelectValue placeholder="Select a resource" />
+              </SelectTrigger>
+              <SelectContent>
+                {options.map((item) => (
+                  <SelectItem key={item} value={item}>
+                    {item}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          ) : (
+            <Input
+              value={name}
+              onChange={(event) => setName(event.target.value)}
+              placeholder={loadingOptions ? "loading resources…" : "resource name"}
+              className="w-64"
+              aria-label="Resource name"
+            />
+          )}
           <Select value={depth} onValueChange={setDepth}>
             <SelectTrigger className="w-28" aria-label="Depth">
               <SelectValue />
@@ -247,6 +320,19 @@ export function TopologyPage() {
           >
             Failure path
           </Button>
+          <Button
+            variant={isGitOpsGraph ? "primary" : "soft"}
+            size="sm"
+            onClick={() => navigate(isGitOpsGraph ? "/topology" : "/topology?graph=gitops")}
+          >
+            <Waypoints className="h-3.5 w-3.5" />
+            {isGitOpsGraph ? "Resource graph" : "GitOps chain"}
+          </Button>
+          {!isGitOpsGraph ? (
+            <span className="text-[11px] text-text-faint">
+              {loadingOptions ? "discovering resources…" : `${options.length} available`}
+            </span>
+          ) : null}
         </CardBody>
       </Card>
 

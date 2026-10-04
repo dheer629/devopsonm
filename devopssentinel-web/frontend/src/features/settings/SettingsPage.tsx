@@ -12,10 +12,11 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { relative } from "@/lib/format";
-import { useApp, type LiveInterval, type ThemeMode } from "@/state/AppContext";
+import { THEMES } from "@/lib/themes";
+import { useApp, type LiveInterval } from "@/state/AppContext";
 
 export function SettingsPage() {
-  const { theme, setTheme, live, setLive, scope, debug } = useApp();
+  const { theme, setTheme, live, setLive, scope, debug, resolvedTheme } = useApp();
   const system = useSystem();
   const pins = usePins();
   const history = useHistory();
@@ -37,14 +38,17 @@ export function SettingsPage() {
           </CardHeader>
           <CardBody className="space-y-2">
             <Row label="Theme">
-              <Select value={theme} onValueChange={(v) => setTheme(v as ThemeMode)}>
-                <SelectTrigger className="w-40" aria-label="Theme">
+              <Select value={theme} onValueChange={setTheme}>
+                <SelectTrigger className="w-44" aria-label="Theme">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="dark">Dark</SelectItem>
-                  <SelectItem value="light">Light</SelectItem>
-                  <SelectItem value="system">System</SelectItem>
+                  <SelectItem value="system">Follow system</SelectItem>
+                  {THEMES.map((item) => (
+                    <SelectItem key={item.id} value={item.id}>
+                      {item.label} · {item.kind}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </Row>
@@ -87,6 +91,11 @@ export function SettingsPage() {
             </Row>
             <Row label="Mode">
               <Badge tone="ok">{system.data?.data.mode ?? "SUPERVISION [READ ONLY]"}</Badge>
+            </Row>
+            <Row label="Theme">
+              <span className="mono">
+                {resolvedTheme.label} ({resolvedTheme.kind})
+              </span>
             </Row>
             <Row label="Kubeconfig">
               <span className="mono truncate">{system.data?.data.kubeconfig ?? "—"}</span>

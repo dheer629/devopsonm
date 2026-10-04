@@ -9,13 +9,24 @@ import {
 } from "react";
 
 import type { Scope } from "@/api/client";
+import {
+  resolveTheme,
+  DEFAULT_DARK,
+  DEFAULT_LIGHT,
+  type ThemeDef,
+  type ThemeKind,
+} from "@/lib/themes";
 
-export type ThemeMode = "dark" | "light" | "system";
+export type ThemeMode = string;
 export type LiveInterval = 0 | 5 | 10 | 30 | 60;
 
 interface AppState {
   theme: ThemeMode;
   setTheme: (t: ThemeMode) => void;
+  /** Concrete theme after resolving "system". */
+  resolvedTheme: ThemeDef;
+  themeKind: ThemeKind;
+  setThemeKind: (kind: ThemeKind) => void;
   context: string;
   setContext: (c: string) => void;
   namespace: string;
@@ -48,6 +59,16 @@ const LS = {
   inspectorWidth: "dsweb.inspectorWidth",
 };
 
+const ALL_THEME_CLASSES = [
+  "theme-midnight",
+  "theme-ocean",
+  "theme-nord",
+  "theme-tokyo",
+  "theme-graphite",
+  "theme-daylight",
+  "theme-solarized",
+];
+
 function readLocal(key: string, fallback: string): string {
   try {
     return window.localStorage.getItem(key) ?? fallback;
@@ -65,8 +86,9 @@ function writeLocal(key: string, value: string): void {
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<ThemeMode>(
-    () => readLocal(LS.theme, "dark") as ThemeMode,
+  const [theme, setThemeState] = useState<ThemeMode>(() => readLocal(LS.theme, "midnight"));
+  const [prefersDark, setPrefersDark] = useState(
+    () => window.matchMedia("(prefers-color-scheme: dark)").matches,
   );
   const [context, setContextState] = useState(() => readLocal(LS.context, ""));
   const [namespace, setNamespaceState] = useState(() => readLocal(LS.namespace, ""));
@@ -84,17 +106,21 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [pageVisible, setPageVisible] = useState(true);
 
   useEffect(() => {
-    const root = document.documentElement;
-    const apply = () => {
-      const prefersDark = window.matchMedia("(prefers-color-scheme: dark)").matches;
-      const dark = theme === "dark" || (theme === "system" && prefersDark);
-      root.classList.toggle("dark", dark);
-    };
-    apply();
     const media = window.matchMedia("(prefers-color-scheme: dark)");
-    media.addEventListener("change", apply);
-    return () => media.removeEventListener("change", apply);
-  }, [theme]);
+    const onChange = () => setPrefersDark(media.matches);
+    media.addEventListener("change", onChange);
+    return () => media.removeEventListener("change", onChange);
+  }, []);
+
+  const resolvedTheme = useMemo(() => resolveTheme(theme, prefersDark), [theme, prefersDark]);
+
+  useEffect(() => {
+    const root = document.documentElement;
+    root.classList.remove(...ALL_THEME_CLASSES);
+    root.classList.add(`theme-${resolvedTheme.id}`);
+    root.classList.toggle("dark", resolvedTheme.kind === "dark");
+    root.dataset.theme = resolvedTheme.id;
+  }, [resolvedTheme]);
 
   useEffect(() => {
     const onVisibility = () => setPageVisible(!document.hidden);
@@ -136,10 +162,20 @@ export function AppProvider({ children }: { children: ReactNode }) {
 
   const scope = useMemo<Scope>(() => ({ context, namespace }), [context, namespace]);
 
+  const setThemeKind = useCallback(
+    (kind: ThemeKind) => {
+      setTheme(kind === "dark" ? DEFAULT_DARK : DEFAULT_LIGHT);
+    },
+    [setTheme],
+  );
+
   const value = useMemo<AppState>(
     () => ({
       theme,
       setTheme,
+      resolvedTheme,
+      themeKind: resolvedTheme.kind,
+      setThemeKind,
       context,
       setContext,
       namespace,
@@ -162,6 +198,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
     [
       theme,
       setTheme,
+      resolvedTheme,
+      setThemeKind,
       context,
       setContext,
       namespace,

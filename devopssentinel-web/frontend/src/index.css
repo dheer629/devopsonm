@@ -1,46 +1,42 @@
 @import "tailwindcss";
 
-/* ------------------------------------------------------------------ *
- * DevOpsSentinel design system -- semantic tokens (spec sections 11-13)
- * Dark is primary. Status is never communicated by colour alone.
- * ------------------------------------------------------------------ */
+/* ==========================================================================
+ * DevOpsSentinel design system
+ *   - 7 professional themes (5 dark, 2 light) + system auto
+ *   - soft "bubble" surface language: generous radii, layered elevation
+ *   - status is never colour-only (icon + text + colour everywhere)
+ * ========================================================================== */
 
 :root {
-  --bg: #f6f7f9;
-  --bg-elevated: #ffffff;
-  --panel: #ffffff;
-  --panel-2: #f1f3f6;
-  --border: #d8dce3;
-  --border-strong: #b9c0cb;
-  --text: #10151c;
-  --text-muted: #4b5563;
-  --text-faint: #5b6472;
-  --accent: #0b6bcb;
-
-  --c-kubernetes: #0e7490;
-  --c-gitops: #7c3aed;
-  --c-pki: #b45309;
-  --c-network: #1d4ed8;
-  --c-storage: #0f766e;
-  --c-success: #15803d;
-  --c-warning: #b45309;
-  --c-critical: #b91c1c;
-  --c-unknown: #6b7280;
-  --c-info: #0369a1;
+  --radius-sm: 8px;
+  --radius: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 22px;
+  --radius-pill: 999px;
+  --shadow-1: 0 1px 2px rgb(0 0 0 / 0.06), 0 1px 1px rgb(0 0 0 / 0.04);
+  --shadow-2: 0 4px 14px rgb(0 0 0 / 0.10), 0 1px 3px rgb(0 0 0 / 0.06);
+  --shadow-3: 0 18px 44px rgb(0 0 0 / 0.20), 0 4px 12px rgb(0 0 0 / 0.10);
 }
 
-.dark {
-  --bg: #0b0e13;
-  --bg-elevated: #11151c;
-  --panel: #12171f;
-  --panel-2: #171d26;
-  --border: #232b36;
-  --border-strong: #33404f;
-  --text: #e6ebf2;
-  --text-muted: #a8b4c4;
-  --text-faint: #8b98a9;
+/* ------------------------------------------------------------------ midnight */
+/* Also the :root default so the very first paint has a valid palette
+ * before React applies the stored theme class. */
+:root,
+.theme-midnight {
+  color-scheme: dark;
+  --bg: #080b10;
+  --bg-grad: radial-gradient(1200px 600px at 12% -10%, #16233a 0%, transparent 60%),
+             radial-gradient(900px 500px at 100% 0%, #101c2e 0%, transparent 55%);
+  --panel: #111722;
+  --panel-2: #172032;
+  --bg-elevated: #0e131c;
+  --border: #222d3f;
+  --border-strong: #33415a;
+  --text: #e8eef7;
+  --text-muted: #a6b4c8;
+  --text-faint: #8494a9;
   --accent: #4c9aff;
-
+  --accent-soft: #4c9aff26;
   --c-kubernetes: #22d3ee;
   --c-gitops: #a78bfa;
   --c-pki: #fbbf24;
@@ -51,6 +47,171 @@
   --c-critical: #f87171;
   --c-unknown: #94a3b8;
   --c-info: #38bdf8;
+}
+
+/* --------------------------------------------------------------------- ocean */
+.theme-ocean {
+  color-scheme: dark;
+  --bg: #04121c;
+  --bg-grad: radial-gradient(1200px 600px at 10% -10%, #0d3b57 0%, transparent 60%),
+             radial-gradient(900px 500px at 100% 0%, #0a2f47 0%, transparent 55%);
+  --panel: #082334;
+  --panel-2: #0d3147;
+  --bg-elevated: #061c2a;
+  --border: #12405c;
+  --border-strong: #1d5c80;
+  --text: #e4f4ff;
+  --text-muted: #9fc4da;
+  --text-faint: #7ba7c2;
+  --accent: #38bdf8;
+  --accent-soft: #38bdf826;
+  --c-kubernetes: #67e8f9;
+  --c-gitops: #c4b5fd;
+  --c-pki: #fcd34d;
+  --c-network: #7dd3fc;
+  --c-storage: #5eead4;
+  --c-success: #4ade80;
+  --c-warning: #fbbf24;
+  --c-critical: #fb7185;
+  --c-unknown: #94a3b8;
+  --c-info: #38bdf8;
+}
+
+/* ---------------------------------------------------------------------- nord */
+.theme-nord {
+  color-scheme: dark;
+  --bg: #242933;
+  --bg-grad: radial-gradient(1000px 520px at 12% -10%, #3b4252 0%, transparent 62%);
+  --panel: #2e3440;
+  --panel-2: #3b4252;
+  --bg-elevated: #292f3a;
+  --border: #434c5e;
+  --border-strong: #4c566a;
+  --text: #eceff4;
+  --text-muted: #c2cbdb;
+  --text-faint: #a3adc2;
+  --accent: #88c0d0;
+  --accent-soft: #88c0d026;
+  --c-kubernetes: #8fbcbb;
+  --c-gitops: #b48ead;
+  --c-pki: #ebcb8b;
+  --c-network: #81a1c1;
+  --c-storage: #8fbcbb;
+  --c-success: #a3be8c;
+  --c-warning: #ebcb8b;
+  --c-critical: #bf616a;
+  --c-unknown: #9aa5b5;
+  --c-info: #81a1c1;
+}
+
+/* --------------------------------------------------------------------- tokyo */
+.theme-tokyo {
+  color-scheme: dark;
+  --bg: #16161e;
+  --bg-grad: radial-gradient(1100px 560px at 14% -12%, #2a2f52 0%, transparent 60%);
+  --panel: #1f2335;
+  --panel-2: #292e42;
+  --bg-elevated: #1a1b26;
+  --border: #33395c;
+  --border-strong: #414868;
+  --text: #c8d3f5;
+  --text-muted: #a9b1d6;
+  --text-faint: #8b93bd;
+  --accent: #7aa2f7;
+  --accent-soft: #7aa2f726;
+  --c-kubernetes: #7dcfff;
+  --c-gitops: #bb9af7;
+  --c-pki: #e0af68;
+  --c-network: #7aa2f7;
+  --c-storage: #73daca;
+  --c-success: #9ece6a;
+  --c-warning: #e0af68;
+  --c-critical: #f7768e;
+  --c-unknown: #9aa5ce;
+  --c-info: #7dcfff;
+}
+
+/* ------------------------------------------------------------------ graphite */
+.theme-graphite {
+  color-scheme: light;
+  --bg: #eef1f6;
+  --bg-grad: radial-gradient(1100px 520px at 10% -12%, #ffffff 0%, transparent 60%),
+             radial-gradient(900px 460px at 100% 0%, #e2e9f5 0%, transparent 55%);
+  --panel: #ffffff;
+  --panel-2: #f4f6fa;
+  --bg-elevated: #ffffff;
+  --border: #dbe1ea;
+  --border-strong: #bcc6d6;
+  --text: #0d1420;
+  --text-muted: #4a5566;
+  --text-faint: #5c6878;
+  --accent: #0b6bcb;
+  --accent-soft: #0b6bcb1f;
+  --c-kubernetes: #0e7490;
+  --c-gitops: #6d28d9;
+  --c-pki: #a16207;
+  --c-network: #1d4ed8;
+  --c-storage: #0f766e;
+  --c-success: #15803d;
+  --c-warning: #a16207;
+  --c-critical: #b91c1c;
+  --c-unknown: #556070;
+  --c-info: #0369a1;
+}
+
+/* ------------------------------------------------------------------ solarized */
+.theme-solarized {
+  color-scheme: light;
+  --bg: #fbf4e4;
+  --bg-grad: radial-gradient(1000px 480px at 12% -12%, #fffdf5 0%, transparent 60%);
+  --panel: #fffdf6;
+  --panel-2: #f3ecd8;
+  --bg-elevated: #fffef9;
+  --border: #e2d8bd;
+  --border-strong: #c9bb96;
+  --text: #073642;
+  --text-muted: #3d6572;
+  --text-faint: #557b86;
+  --accent: #2077b4;
+  --accent-soft: #2077b41f;
+  --c-kubernetes: #2aa198;
+  --c-gitops: #6c71c4;
+  --c-pki: #b58900;
+  --c-network: #268bd2;
+  --c-storage: #2aa198;
+  --c-success: #859900;
+  --c-warning: #b58900;
+  --c-critical: #dc322f;
+  --c-unknown: #657b83;
+  --c-info: #268bd2;
+}
+
+/* ------------------------------------------------------------------- daylight */
+.theme-daylight {
+  color-scheme: light;
+  --bg: #eaeff7;
+  --bg-grad: radial-gradient(1100px 520px at 8% -14%, #ffffff 0%, transparent 62%),
+             radial-gradient(900px 460px at 100% 0%, #dbe6f7 0%, transparent 58%);
+  --panel: #ffffff;
+  --panel-2: #f1f5fb;
+  --bg-elevated: #ffffff;
+  --border: #d3dcea;
+  --border-strong: #b2c0d6;
+  --text: #0b1626;
+  --text-muted: #44546b;
+  --text-faint: #55637a;
+  --accent: #2563eb;
+  --accent-soft: #2563eb1f;
+  --c-kubernetes: #0e7490;
+  --c-gitops: #7c3aed;
+  --c-pki: #b45309;
+  --c-network: #1d4ed8;
+  --c-storage: #0f766e;
+  --c-success: #15803d;
+  --c-warning: #b45309;
+  --c-critical: #dc2626;
+  --c-unknown: #556070;
+  --c-info: #0369a1;
 }
 
 @theme inline {
@@ -64,6 +225,7 @@
   --color-text-muted: var(--text-muted);
   --color-text-faint: var(--text-faint);
   --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
   --color-kubernetes: var(--c-kubernetes);
   --color-gitops: var(--c-gitops);
   --color-pki: var(--c-pki);
@@ -74,6 +236,10 @@
   --color-critical: var(--c-critical);
   --color-unknown: var(--c-unknown);
   --color-info: var(--c-info);
+  --radius-sm: var(--radius-sm);
+  --radius-md: var(--radius);
+  --radius-lg: var(--radius-lg);
+  --radius-xl: var(--radius-xl);
   --font-mono: ui-monospace, "SFMono-Regular", "JetBrains Mono", "Cascadia Code", Consolas, monospace;
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
@@ -86,7 +252,9 @@ body,
 
 body {
   margin: 0;
-  background: var(--bg);
+  background-color: var(--bg);
+  background-image: var(--bg-grad);
+  background-attachment: fixed;
   color: var(--text);
   font-family: var(--font-sans);
   font-size: 13px;
@@ -95,12 +263,36 @@ body {
 
 *:focus-visible {
   outline: 2px solid var(--accent);
-  outline-offset: 1px;
+  outline-offset: 2px;
+  border-radius: var(--radius-sm);
 }
 
 .mono {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+}
+
+/* Soft "bubble" surfaces ---------------------------------------------------- */
+.surface {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-1);
+}
+
+.surface-raised {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-2);
+}
+
+.surface-glass {
+  background: color-mix(in oklab, var(--panel) 88%, transparent);
+  backdrop-filter: blur(14px) saturate(1.2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-2);
 }
 
 .scroll-thin::-webkit-scrollbar {
@@ -109,7 +301,7 @@ body {
 }
 .scroll-thin::-webkit-scrollbar-thumb {
   background: var(--border-strong);
-  border-radius: 6px;
+  border-radius: var(--radius-pill);
 }
 .scroll-thin::-webkit-scrollbar-track {
   background: transparent;
@@ -123,3 +315,4 @@ body {
     transition-duration: 0.001ms !important;
   }
 }
+

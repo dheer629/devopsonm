@@ -74,8 +74,8 @@ export function Tooltip({
       <TooltipPrimitive.Trigger asChild>{children}</TooltipPrimitive.Trigger>
       <TooltipPrimitive.Portal>
         <TooltipPrimitive.Content
-          sideOffset={6}
-          className="z-50 max-w-xs rounded-md border border-border bg-bg-elevated px-2 py-1 text-[11.5px] text-text shadow-lg"
+          sideOffset={8}
+          className="surface-raised z-50 max-w-xs px-2.5 py-1.5 text-[11.5px] text-text"
         >
           {content}
         </TooltipPrimitive.Content>
@@ -85,5 +85,5 @@ export function Tooltip({
 }
 
 export function Skeleton({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("animate-pulse rounded bg-panel-2", className)} {...props} />;
+  return <div className={cn("animate-pulse rounded-xl bg-panel-2", className)} {...props} />;
 }

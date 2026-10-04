@@ -5,13 +5,13 @@ import { Badge } from "@/components/ui/badge";
 import { useApp } from "@/state/AppContext";
 
 export function StatusBar() {
-  const { context, namespace, live, liveActive, debug } = useApp();
+  const { context, namespace, live, liveActive, debug, resolvedTheme } = useApp();
   const system = useSystem();
   const data = system.data?.data;
   const connected = Boolean(data?.engineAvailable && data?.bashAvailable);
 
   return (
-    <footer className="flex flex-wrap items-center gap-3 border-t border-border bg-panel px-3 py-1 text-[11px] text-text-muted">
+    <footer className="flex flex-wrap items-center gap-3 border-t border-border/80 bg-panel/85 px-3 py-1.5 text-[11px] text-text-muted backdrop-blur-xl">
       <span className="inline-flex items-center gap-1">
         {connected ? (
           <Wifi className="h-3 w-3 text-success" aria-hidden="true" />
@@ -40,6 +40,7 @@ export function StatusBar() {
         <Badge tone={liveActive ? "ok" : "neutral"}>
           {live === 0 ? "LIVE OFF" : liveActive ? `LIVE ${live}s` : `LIVE ${live}s PAUSED`}
         </Badge>
+        <Badge tone="accent">{resolvedTheme.label}</Badge>
         {debug ? <span className="mono">debug</span> : null}
       </span>
     </footer>

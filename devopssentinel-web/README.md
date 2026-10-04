@@ -87,7 +87,8 @@ deployment.
 | ETDP / Database / Kafka / Smart Health report views | ✅ |
 | Incident workspace (`/incidents/:id`), PRE/POST baseline comparison (`/baselines`), Exports page (`/exports`) | ✅ |
 | Doctor capability matrix, Settings, pins, history, local exports (JSON/CSV/NDJSON) | ✅ |
-| Command palette (Ctrl+K, `/`), keyboard chords (`g d`, `g p`, …), theme dark/light/system | ✅ |
+| Command palette (Ctrl+K, `/`), keyboard chords (`g d`, `g p`, …) | ✅ |
+| 7 professional themes (5 dark / 2 light) + system auto, swatch picker, bubble surface language | ✅ |
 | Virtualized tables (5,000-row inventory test), status = icon + text + colour | ✅ |
 | SSE endpoints for live refresh and streamed logs | ✅ |
 | pytest (48), Vitest (18), Playwright smoke + axe (frontend-only, fixture-backed) | ✅ |
@@ -95,6 +96,26 @@ deployment.
 
 See **[docs/FEATURE_PARITY_MATRIX.md](docs/FEATURE_PARITY_MATRIX.md)** for the complete
 per-feature accounting — there is no silent feature loss.
+
+## Interface & themes
+
+A dense, calm operations surface with soft "bubble" geometry: pill navigation and controls, layered
+elevation, blurred top bar and status bar, and rounded data surfaces. Seven themes ship built in,
+switchable from the palette icon in the top bar (or **Settings → Theme**):
+
+| Theme | Kind | Character |
+| --- | --- | --- |
+| **Midnight** | dark | default graphite operations theme |
+| **Ocean** | dark | deep blue, high-contrast telemetry |
+| **Nord** | dark | muted arctic palette |
+| **Tokyo** | dark | night-city violet and cyan |
+| **Graphite** | light | neutral light for bright rooms |
+| **Daylight** | light | cool light with strong separation |
+| **Solarized** | light | warm low-glare paper tone |
+
+Plus **Follow system**, which resolves to Midnight/Graphite from the OS preference. The active theme
+is written to `<html data-theme>` and persisted locally. Status is always **icon + text + colour**,
+so nothing depends on the palette.
 
 ## Architecture
 

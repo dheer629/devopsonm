@@ -128,3 +128,27 @@ test("exports page offers structured downloads only", async ({ page }) => {
   await expect(page.getByRole("link", { name: "JSON" }).first()).toBeVisible();
   await expect(page.getByText(/never a screenshot/)).toBeVisible();
 });
+
+test("theme picker switches the whole palette", async ({ page }) => {
+  await page.goto("/dashboard");
+  await expect(page.locator("html")).toHaveAttribute("data-theme", /.+/);
+
+  await page.getByRole("button", { name: "Choose theme" }).click();
+  await page.getByRole("menuitem", { name: /Nord/ }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "nord");
+  await expect(page.locator("html")).toHaveClass(/dark/);
+
+  await page.getByRole("button", { name: "Choose theme" }).click();
+  await page.getByRole("menuitem", { name: /Solarized/ }).click();
+  await expect(page.locator("html")).toHaveAttribute("data-theme", "solarized");
+  await expect(page.locator("html")).not.toHaveClass(/dark/);
+});
+
+test("topology discovers resources instead of demanding a typed name", async ({ page }) => {
+  await page.goto("/topology");
+  await expect(page.getByRole("heading", { name: "Dependency Topology" })).toBeVisible();
+  // The picker is populated from the cluster and auto-selects the first object.
+  await expect(page.getByLabel("Resource name")).toBeVisible();
+  await expect(page.getByText(/available$/)).toBeVisible();
+  await expect(page.getByRole("button", { name: "GitOps chain" })).toBeVisible();
+});
