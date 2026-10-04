@@ -14,7 +14,7 @@ import shutil
 from pathlib import Path
 
 from ..config import settings
-from ..security import validate_context
+from ..security import assert_read_only, validate_context
 
 _ALLOWED = {
     ("config", "get-contexts"),
@@ -23,14 +23,30 @@ _ALLOWED = {
     ("get", "ns"),
 }
 
+# Global flags that take a value and may precede the verb.
+_VALUE_FLAGS = {"--context", "--kubeconfig", "--namespace", "--cluster", "--user"}
+
 
 class KubeError(RuntimeError):
     pass
 
 
-async def _run(args: list[str], timeout: float = 15.0) -> tuple[int, str, str]:
-    if not args or tuple(args[:2]) not in _ALLOWED:
+def _validate(args: list[str]) -> None:
+    """Allow only the three read-only discovery invocations.
+
+    Global flags may precede the verb, so locate the verb pair instead of
+    assuming it is at position 0. Mutation verbs are rejected outright.
+    """
+    assert_read_only(list(args))
+    index = 0
+    while index < len(args) and args[index].startswith("-"):
+        index += 2 if args[index] in _VALUE_FLAGS else 1
+    if tuple(args[index : index + 2]) not in _ALLOWED:
         raise KubeError(f"disallowed kubectl invocation: {' '.join(args)}")
+
+
+async def _run(args: list[str], timeout: float = 15.0) -> tuple[int, str, str]:
+    _validate(args)
     kubectl = shutil.which("kubectl")
     if not kubectl:
         raise KubeError("kubectl is not available on PATH")

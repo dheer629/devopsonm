@@ -1,4 +1,5 @@
 import { Monitor, Moon, Search, ShieldCheck, Sun } from "lucide-react";
+import { useEffect } from "react";
 
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -28,6 +29,13 @@ export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
 
   const contextList = contexts.data?.data.contexts ?? [];
   const namespaceList = namespaces.data?.data.namespaces ?? [];
+
+  // First run: adopt the kubeconfig's current context so the workspace is
+  // immediately scoped instead of showing an empty selector.
+  const current = contexts.data?.data.current;
+  useEffect(() => {
+    if (!context && current) setContext(current);
+  }, [context, current, setContext]);
 
   return (
     <header className="flex flex-wrap items-center gap-2 border-b border-border bg-panel px-3 py-2">

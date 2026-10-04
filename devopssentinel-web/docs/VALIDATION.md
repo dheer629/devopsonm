@@ -53,27 +53,56 @@ frontend served from the production `dist/` build.
 * Exports page offers only structured downloads and states that screenshots are not used.
 * axe reports zero serious/critical violations on 10 routes in both dark and light themes.
 
-## Cluster integration
+## Live cluster validation (executed)
 
-The browser suite is deliberately **fixture-backed** so it runs in CI without a cluster. Real
-cluster validation is performed by the existing DevOpsSentinel WSL harness:
+Verified against a real vcluster (`kubernetes-super-admin@dev`, node `dev`, v1.30.4) running in
+Docker under WSL2, with the app served from WSL and Chrome on Windows.
 
-```bash
-cd ../devopssentinel-e2e && ./run-all.sh          # engine-level, disposable vcluster
-bash ../scripts/test-faults.sh vcluster-docker_dev # CrashLoopBackOff, Pending PVC, TLS, canary
-```
+| Check | Result |
+| --- | --- |
+| Engine reachable (`--doctor`, `--resources`, `--gitops`) | ✅ real data |
+| `GET /api/v1/contexts` | ✅ `["kubernetes-super-admin@dev"]` |
+| `GET /api/v1/namespaces` | ✅ 6 namespaces |
+| `GET /api/v1/pods` (flux-system) | ✅ `OK` / `LIVE` / 4 pods / 1132 ms |
+| `GET /api/v1/findings` | ✅ `OK` / `LIVE` / 30 findings / 7790 ms |
+| `GET /api/v1/gitops` | ✅ `WARNING` / `LIVE` / 8 objects / 1088 ms |
+| Startup banner in WSL | ✅ `Kubernetes CONNECTED`, `SUPERVISION [READ ONLY]` |
+| Chrome on Windows reaching `127.0.0.1:8765` | ✅ |
 
-Run the web UI against the same disposable cluster to validate live behaviour:
+Real captured formats that the parsers were aligned to:
 
-```bash
-# in WSL, with the disposable vcluster context active
-./devopssentinel-web --context vcluster-docker_dev --namespace devopsonm
-```
+* `--resources` — TAB-separated `POD READY STATUS RESTARTS AGE CPU USED … NODE IP OWNER …`
+* `--triage` — TAB-separated `SEVERITY CATEGORY RESOURCE ISSUE EVIDENCE NEXT CHECK`
+* `--gitops` — `Kind/name [STATUS REASON]` blocks with indented `key=value` lines
+* `--network` — `Service/<name> type=… clusterIP=… ports=…` + `EndpointSlice: … ready=N/M`
+* `--doctor` — column-aligned `tool  STATUS` lines
+* `--certificates` / storage — TAB-separated metadata tables
 
-A live-cluster pass has **not** been executed in this environment (no WSL/kubectl available on the
-Windows host that produced this build). The adapter fails safe: when the engine or bash is missing,
-operations return `status: "UNAVAILABLE"` with a documented reason and the UI shows the error state
-rather than fabricating data. This is the one acceptance item that remains open.
+### Defects found and fixed during live validation
+
+| Defect | How it was found | Fix |
+| --- | --- | --- |
+| Parsers assumed space-separated tables; the engine emits TAB-separated tables, so pods/certificates/PVCs came back empty | live capture | `split_row` is TAB-aware; header detection requires all-caps columns (so `SOURCE  pods  STATUS` is not a header) |
+| GitOps report was a block format, not a table | live capture | dedicated block parser (`Kind/name [STATUS REASON]` + `key=value`), including multi-word `message=` values |
+| Network report is a Service/EndpointSlice tree, not a table | live capture | regex tree parser that attaches `ready=N/M` to the owning service |
+| Read-only kubectl guard rejected `--context X get namespaces` (it assumed the verb was at position 0) | live API call returned `UNAVAILABLE` | guard now skips global flags before matching the verb, and still blocks mutation verbs |
+| Pods table invented its own restart threshold, contradicting the engine's triage | live comparison | readiness drives pod status; restart counts stay a column and findings come from the engine |
+| First run showed an empty context selector | live browser check | the UI adopts the kubeconfig's current context automatically |
+| `pydantic-settings` was not in the WSL dependency set | live start | added to `requirements.txt` install step |
+
+### Environment notes (not application defects)
+
+* The vcluster container (`ghcr.io/loft-sh/vm-container`) crash-loops with
+  `ERROR: this script needs /sys/fs/cgroup/cgroup.procs to be empty`; it exited with code 128 while
+  validation was running. `docker start vcluster.cp.dev` brings it back and it then stays healthy.
+  This is the local cluster's own entrypoint/cgroup issue, not DevOpsSentinel.
+* The vcluster docker driver assigns a random host port when the container is recreated, so the
+  kubeconfig `server:` URL goes stale. A fresh admin kubeconfig was extracted from
+  `/var/lib/vcluster/kubeconfig.yaml` into `~/.kube/vcluster-dev.yaml` with the current port; the
+  user's `~/.kube/config` was backed up before any edit.
+* WSL Ubuntu had no `pip`/`python3-venv` (PEP 668 externally managed), so backend dependencies were
+  installed into the user site with `get-pip.py --user --break-system-packages`.
+
 
 ## Reproduce everything
 

@@ -18,12 +18,27 @@ intelligence and **no Kubernetes mutation of any kind**.
 
 ## Quick start
 
+### Linux / WSL (primary)
+
 ```bash
 ./devopssentinel-web            # binds 127.0.0.1:8765, serves the production build
 ./devopssentinel-web --open     # also opens Chrome
 ./devopssentinel-web --debug    # developer diagnostics panel
 ./devopssentinel-web --incident INC12345
 ```
+
+### Windows
+
+If the engine, `kubectl` and your kubeconfig live inside WSL (the usual setup), run the wrapper —
+it starts the app inside WSL and WSL2 forwards `127.0.0.1`, so Chrome on Windows reaches it:
+
+```bat
+devopssentinel-web.cmd --open
+set DSWEB_WSL_DISTRO=Ubuntu    rem override the distribution if needed
+```
+
+The wrapper normalises CRLF in the launcher, so a Windows checkout works without `dos2unix`.
+
 
 Startup output:
 
@@ -92,13 +107,18 @@ See **[docs/SECURITY.md](docs/SECURITY.md)** and the API contract in
 
 ## Honest limitations
 
-* Report rows are normalized from the engine's **plain-text report lines**, not from a per-object
-  JSON schema the engine does not yet emit. Rows that cannot be parsed confidently are never
-  invented: the raw expert view always carries the original lines.
+* Report rows are normalized from the engine's **plain-text report lines** (TAB-separated tables and
+  `Kind/name [STATUS REASON]` blocks), not from a per-object JSON schema the engine does not yet
+  emit. Rows that cannot be parsed confidently are never invented: the raw expert view always carries
+  the original lines, argv and exit status.
+* Workload rows are derived from pod owner references (`Deployment/x`, `StatefulSet/y`) because the
+  engine's `--resources` report lists pods plus totals, not a separate workload table.
 * `--self-test`, `--explain` and `--ui-debug` produce plain text in the engine, so they are exposed
   as raw text rather than typed rows.
 * Interactive-only engine capabilities (live TLS probe, interactive log follow, credential prompts)
   are surfaced as explicit `UNAVAILABLE` responses with a documented reason instead of being
   re-implemented in Python.
-* The Playwright suite runs against deterministic fixtures. Real-cluster validation is performed by
-  the existing DevOpsSentinel WSL E2E harness (`devopssentinel-e2e/`).
+* The Playwright suite runs against deterministic fixtures. Live-cluster validation was performed
+  manually against a real vcluster — see [docs/VALIDATION.md](docs/VALIDATION.md) for the captured
+  results and the defects it surfaced.
+
