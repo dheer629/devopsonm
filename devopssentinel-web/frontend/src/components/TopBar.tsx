@@ -37,8 +37,10 @@ export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
   // The engine requires a namespace in non-interactive mode, so adopt a
   // sensible default (prefer `default`) once the list is available. Without
   // this every domain page reports "namespace is required" and looks empty.
+  // A stale stored value that no longer exists is replaced too.
   useEffect(() => {
-    if (namespace || namespaceList.length === 0) return;
+    if (namespaceList.length === 0) return;
+    if (namespace && namespaceList.includes(namespace)) return;
     const preferred = namespaceList.includes("default") ? "default" : namespaceList[0];
     setNamespace(preferred);
   }, [namespace, namespaceList, setNamespace]);
