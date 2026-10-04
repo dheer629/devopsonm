@@ -103,3 +103,28 @@ test("keyboard chord g d navigates to the dashboard", async ({ page }) => {
   await page.keyboard.press("d");
   await expect(page.getByRole("heading", { name: "Operations Dashboard" })).toBeVisible();
 });
+
+test("incident workspace keeps notes local and shows evidence", async ({ page }) => {
+  await page.goto("/incidents/INC12345");
+  await expect(page.getByRole("heading", { name: /Incident INC12345/ })).toBeVisible();
+  await expect(page.getByText("INCIDENT MODE")).toBeVisible();
+  await expect(page.getByText("checked pods after rollout")).toBeVisible();
+  await page.getByLabel("New incident note").fill("second observation");
+  await page.getByRole("button", { name: "Add" }).click();
+});
+
+test("pre/post page compares a stored baseline and classifies the change", async ({ page }) => {
+  await page.goto("/baselines");
+  await expect(page.getByRole("heading", { name: "PRE / POST Change Validation" })).toBeVisible();
+  await expect(page.getByText("CAPTURE PRE")).toBeVisible();
+  await page.getByRole("button", { name: "Compare" }).first().click();
+  await expect(page.getByText("DEGRADED")).toBeVisible();
+  await expect(page.getByText("UNCHANGED")).toBeVisible();
+});
+
+test("exports page offers structured downloads only", async ({ page }) => {
+  await page.goto("/exports");
+  await expect(page.getByRole("heading", { name: "Exports" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "JSON" }).first()).toBeVisible();
+  await expect(page.getByText(/never a screenshot/)).toBeVisible();
+});

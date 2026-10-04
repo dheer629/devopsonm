@@ -313,6 +313,48 @@ export async function installFixtures(page: Page): Promise<void> {
     }
     if (path.endsWith("/pins")) return json(envelope([], { source: "LOCAL" }));
     if (path.endsWith("/history")) return json(envelope([], { source: "LOCAL" }));
+    if (path.includes("/baselines/compare")) {
+      return json(
+        envelope(
+          {
+            baseline: "pre-change",
+            capturedAt: 1_790_000_000,
+            rows: [
+              {
+                resource: "transformer",
+                pre: { status: "OK", restarts: 0 },
+                post: { status: "OK", restarts: 0 },
+                result: "UNCHANGED",
+              },
+              {
+                resource: "log-transformer",
+                pre: { status: "OK", restarts: 0 },
+                post: { status: "CRITICAL", restarts: 7 },
+                result: "DEGRADED",
+              },
+            ],
+          },
+          { source: "LOCAL" },
+        ),
+      );
+    }
+    if (path.includes("/baselines")) {
+      return json(
+        envelope(
+          [{ name: "pre-change", context: "vcluster-docker_dev", namespace: "devopsonm", capturedAt: 1_790_000_000 }],
+          { source: "LOCAL" },
+        ),
+      );
+    }
+    if (path.includes("/notes")) {
+      return json(
+        envelope(
+          [{ id: "n1", text: "checked pods after rollout", author: "operator", at: 1_790_000_000 }],
+          { source: "LOCAL" },
+        ),
+      );
+    }
+    if (path.includes("/evidence/")) return json(envelope([], { source: "LOCAL" }));
     if (path.endsWith("/evidence")) return json(envelope([], { source: "LOCAL" }));
     if (path.endsWith("/diagnostics")) {
       return json(envelope({ cache: { entries: 3, hits: 5, misses: 2 }, audit: [] }, { source: "LOCAL" }));

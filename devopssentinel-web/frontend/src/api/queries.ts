@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { del, getEnvelope, getOperation, postJson, type Scope } from "./client";
 import type {
+  BaselineComparison,
+  BaselineSummary,
   Certificate,
   Envelope,
   EventResource,
@@ -10,6 +12,7 @@ import type {
   Graph,
   HistoryItem,
   LogBundle,
+  NoteItem,
   OperationResponse,
   Pin,
   Pod,
@@ -295,6 +298,71 @@ export function useAddNote() {
   return useMutation({
     mutationFn: (payload: { incident_id: string; text: string }) =>
       postJson("/api/v1/notes", payload),
+  });
+}
+
+export function useNotes(incidentId: string) {
+  return useQuery({
+    queryKey: ["notes", incidentId],
+    queryFn: () => getEnvelope<NoteItem[]>(`/api/v1/notes/${incidentId}`),
+    enabled: Boolean(incidentId),
+  });
+}
+
+export function useBaselines() {
+  return useQuery({
+    queryKey: ["baselines"],
+    queryFn: () => getEnvelope<BaselineSummary[]>("/api/v1/baselines"),
+  });
+}
+
+export function useCaptureBaseline() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (payload: { name: string; context?: string; namespace?: string }) =>
+      postJson<BaselineSummary>("/api/v1/baselines", payload),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["baselines"] }),
+  });
+}
+
+export function useCompareBaseline() {
+  return useMutation({
+    mutationFn: (payload: { name: string }) =>
+      postJson<BaselineComparison>("/api/v1/baselines/compare", payload),
+  });
+}
+
+export function useEvidenceIncidents() {
+  return useQuery({
+    queryKey: ["evidence"],
+    queryFn: () =>
+      getEnvelope<{ id: string; files: number; bytes: number; modified: number }[]>(
+        "/api/v1/evidence",
+      ),
+  });
+}
+
+export function useEvidenceFiles(incidentId: string) {
+  return useQuery({
+    queryKey: ["evidence", incidentId],
+    queryFn: () =>
+      getEnvelope<{ path: string; bytes: number; modified: number }[]>(
+        `/api/v1/evidence/${incidentId}`,
+      ),
+    enabled: Boolean(incidentId),
+  });
+}
+
+export function useEvidenceFile(incidentId: string, path: string) {
+  return useQuery({
+    queryKey: ["evidence-file", incidentId, path],
+    queryFn: () =>
+      getEnvelope<{ path: string; content: string }>(
+        `/api/v1/evidence/${incidentId}/file`,
+        {},
+        { path },
+      ),
+    enabled: Boolean(incidentId) && Boolean(path),
   });
 }
 

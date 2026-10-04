@@ -3,7 +3,18 @@ import { expect, test } from "@playwright/test";
 
 import { installFixtures } from "./fixtures";
 
-const ROUTES = ["/dashboard", "/workloads", "/findings", "/pki", "/gitops", "/settings", "/doctor"];
+const ROUTES = [
+  "/dashboard",
+  "/workloads",
+  "/findings",
+  "/pki",
+  "/gitops",
+  "/settings",
+  "/doctor",
+  "/baselines",
+  "/exports",
+  "/incidents/INC12345",
+];
 
 test.beforeEach(async ({ page }) => {
   await installFixtures(page);

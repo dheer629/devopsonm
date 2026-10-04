@@ -11,8 +11,8 @@ frontend served from the production `dist/` build.
 | Frontend typecheck (strict) | `cd frontend && npm run typecheck` | **clean** |
 | Frontend unit | `cd frontend && npx vitest run` | **18 passed** (4 files) |
 | Frontend production build | `cd frontend && npm run build` | **built** (840 kB JS / 43 kB CSS; 261 kB / 8 kB gzip) |
-| Browser E2E (dark + light) | `cd frontend && npx playwright test` | **46 passed** (23 tests × 2 themes) |
-| Accessibility (axe) | `cd frontend && npx playwright test e2e/a11y.spec.ts` | **14 passed** (7 routes × 2 themes) |
+| Browser E2E (dark + light) | `cd frontend && npx playwright test` | **58 passed** (29 tests × 2 themes) |
+| Accessibility (axe) | `cd frontend && npx playwright test e2e/a11y.spec.ts` | **20 passed** (10 routes × 2 themes) |
 | Live server smoke | `uvicorn app.main:app` + HTTP checks | `/api/v1/version` 200, `/api/v1/system` 200, `/` and `/workloads` 200, fail-safe operation returns `UNAVAILABLE` envelope (not 500) |
 
 ### Defects found and fixed during validation
@@ -48,7 +48,10 @@ frontend served from the production `dist/` build.
 * PKI posture, topology inspector, storage/network inventories, doctor matrix, settings exports.
 * Unknown routes render an explicit `UNAVAILABLE` state; refresh preserves the route; `g d` chord
   navigates.
-* axe reports zero serious/critical violations on 7 routes in both dark and light themes.
+* Incident workspace shows `INCIDENT MODE`, keeps operator notes local and lists evidence files.
+* PRE/POST page captures a baseline, compares it and classifies changes (`DEGRADED`/`UNCHANGED`).
+* Exports page offers only structured downloads and states that screenshots are not used.
+* axe reports zero serious/critical violations on 10 routes in both dark and light themes.
 
 ## Cluster integration
 

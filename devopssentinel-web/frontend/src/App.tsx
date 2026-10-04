@@ -4,12 +4,15 @@ import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AppShell } from "@/components/AppShell";
 import { EmptyState } from "@/components/common";
 import { TooltipProvider } from "@/components/ui/primitives";
+import { BaselinePage } from "@/features/baselines/BaselinePage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
 import { DoctorPage } from "@/features/doctor/DoctorPage";
 import { EvidencePage } from "@/features/evidence/EvidencePage";
 import { EventsPage } from "@/features/events/EventsPage";
+import { ExportsPage } from "@/features/exports/ExportsPage";
 import { FindingsPage } from "@/features/findings/FindingsPage";
 import { GitOpsPage } from "@/features/gitops/GitOpsPage";
+import { IncidentPage } from "@/features/incidents/IncidentPage";
 import { NetworkPage } from "@/features/network/NetworkPage";
 import { PkiPage } from "@/features/pki/PkiPage";
 import { ReportPage } from "@/features/reports/ReportPage";
@@ -63,7 +66,10 @@ export function App() {
                 <Route path="/kafka" element={<ReportPage kind="kafka" />} />
                 <Route path="/etdp" element={<ReportPage kind="etdp" />} />
                 <Route path="/findings" element={<FindingsPage />} />
+                <Route path="/incidents/:id" element={<IncidentPage />} />
+                <Route path="/baselines" element={<BaselinePage />} />
                 <Route path="/evidence" element={<EvidencePage />} />
+                <Route path="/exports" element={<ExportsPage />} />
                 <Route path="/doctor" element={<DoctorPage />} />
                 <Route path="/settings" element={<SettingsPage />} />
                 <Route path="*" element={<NotFoundPage />} />

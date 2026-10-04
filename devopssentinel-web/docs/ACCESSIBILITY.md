@@ -16,6 +16,9 @@ Run with `@axe-core/playwright` against the production build, tags
 | `/gitops` | ✅ | ✅ |
 | `/settings` | ✅ | ✅ |
 | `/doctor` | ✅ | ✅ |
+| `/baselines` | ✅ | ✅ |
+| `/exports` | ✅ | ✅ |
+| `/incidents/INC12345` | ✅ | ✅ |
 
 Reproduce:
 

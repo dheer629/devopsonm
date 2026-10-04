@@ -70,6 +70,7 @@ deployment.
 | PKI / TLS dashboard, expiry posture, consumer/reference tracing | ✅ |
 | Network services + endpoint gaps, Storage PVC center | ✅ |
 | ETDP / Database / Kafka / Smart Health report views | ✅ |
+| Incident workspace (`/incidents/:id`), PRE/POST baseline comparison (`/baselines`), Exports page (`/exports`) | ✅ |
 | Doctor capability matrix, Settings, pins, history, local exports (JSON/CSV/NDJSON) | ✅ |
 | Command palette (Ctrl+K, `/`), keyboard chords (`g d`, `g p`, …), theme dark/light/system | ✅ |
 | Virtualized tables (5,000-row inventory test), status = icon + text + colour | ✅ |

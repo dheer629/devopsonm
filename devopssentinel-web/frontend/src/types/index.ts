@@ -199,6 +199,41 @@ export interface SystemInfo {
   evidenceIncidents: number;
 }
 
+export interface NoteItem {
+  id: string;
+  text: string;
+  author: string;
+  at: number;
+}
+
+export interface BaselineSummary {
+  name: string;
+  context: string;
+  namespace: string;
+  capturedAt: number;
+}
+
+export type ComparisonResult =
+  | "UNCHANGED"
+  | "IMPROVED"
+  | "DEGRADED"
+  | "NEW"
+  | "REMOVED"
+  | "UNKNOWN";
+
+export interface ComparisonRow {
+  resource: string;
+  pre: { status?: string | null; restarts?: number | null };
+  post: { status?: string | null; restarts?: number | null };
+  result: ComparisonResult;
+}
+
+export interface BaselineComparison {
+  baseline: string;
+  capturedAt: number;
+  rows: ComparisonRow[];
+}
+
 export interface SearchResult {
   kind: string;
   name: string;

@@ -54,8 +54,9 @@ Legend
 | Live TLS probe / certificate-vs-endpoint comparison | CLI ONLY | `POST /api/v1/tls/inspect` returns `UNAVAILABLE` with a reason instead of opening arbitrary sockets from browser input |
 | Interactive read-only PostgreSQL session | CLI ONLY | Credentials must never traverse the browser; discovery remains available |
 | Kafka interactive tools | CLI ONLY | Same reason |
-| Incident session + exports under `~/.devopssentinel/evidence/ID` | SUPPORTED | `/evidence`, `/api/v1/notes/{id}`, `--incident` launcher flag |
-| `export_center` | SUPPORTED | `/settings` exports (JSON/CSV/NDJSON) + `GET /api/v1/exports/{domain}` |
+| Incident session + exports under `~/.devopssentinel/evidence/ID` | SUPPORTED | `/incidents/:id` workspace (notes + evidence + pins + exports), `/evidence`, `/api/v1/notes/{id}`, `--incident` launcher flag |
+| PRE / POST change validation | SUPPORTED | `/baselines` (`GET/POST /api/v1/baselines`, `POST /api/v1/baselines/compare`) with UNCHANGED / IMPROVED / DEGRADED / NEW / REMOVED classification |
+| `export_center` | SUPPORTED | `/exports` page + `/settings` + `GET /api/v1/exports/{domain}` (JSON/CSV/NDJSON) |
 | Global search | SUPPORTED | Command palette (Ctrl+K) + `GET /api/v1/search` |
 
 ## 3. Mutation capabilities (must never exist in the browser)
@@ -94,11 +95,11 @@ Legend
 
 | Status | Count |
 | --- | --- |
-| SUPPORTED | 22 |
-| PARTIAL | 13 |
+| SUPPORTED | 18 |
+| PARTIAL | 11 |
 | CLI ONLY | 4 |
 | BLOCKED | 6 |
-| NOT APPLICABLE | 5 |
+| NOT APPLICABLE | 4 |
 
 No engine capability is silently dropped: every row above is either reachable, explicitly
 downgraded with a reason, or intentionally blocked.
