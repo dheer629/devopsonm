@@ -19,12 +19,14 @@ import re
 from ..models.resources import (
     Capability,
     Certificate,
+    DbService,
     Event,
     Finding,
     GitOpsObject,
     Graph,
     GraphEdge,
     GraphNode,
+    KafkaService,
     LogBundle,
     LogLine,
     Pod,
@@ -714,6 +716,7 @@ def normalize_certificates(lines: list[str], namespace: str = "") -> list[Certif
 
 _PVC_TREE = re.compile(r"^PVC/(\S+)\s+phase=(\S+)\s+requested=(\S+)\s+capacity=(\S+)")
 _PVC_PV = re.compile(r"\bPV:\s*(\S+)\s+class=(\S+)")
+_PVC_POD = re.compile(r"\bPod:\s*(\S+)\s+node=")
 
 
 def normalize_pvcs(lines: list[str], namespace: str = "") -> list[PVC]:
@@ -750,6 +753,9 @@ def normalize_pvcs(lines: list[str], namespace: str = "") -> list[PVC]:
             if pv:
                 current.volume = pv.group(1)
                 current.storage_class = pv.group(2)
+            pod = _PVC_POD.search(line)
+            if pod and pod.group(1) not in current.consumers:
+                current.consumers.append(pod.group(1))
     flush()
 
     if pvcs:
@@ -783,6 +789,87 @@ def normalize_pvcs(lines: list[str], namespace: str = "") -> list[PVC]:
                 )
             )
     return pvcs
+
+
+# --------------------------------------------------------------------------
+# Database / Kafka discovery tables (engine `--postgres-discovery`,
+# `--kafka-discovery`). Both emit TAB-separated `SERVICE ...` tables.
+# --------------------------------------------------------------------------
+
+_UNKNOWN_MARKERS = ("", "-", "UNKNOWN")
+
+
+def _known(value: str) -> bool:
+    return value.strip().upper() not in _UNKNOWN_MARKERS and "UNKNOWN" not in value.upper()
+
+
+def normalize_db_services(lines: list[str], namespace: str = "") -> list[DbService]:
+    """Parse the engine's PostgreSQL / generic DB discovery table."""
+    rows: list[DbService] = []
+    for header, table_rows in extract_tables(lines):
+        low = [h.lower() for h in header]
+        if "service" not in low:
+            continue
+        if not any(h in low for h in ("ready endpoint", "database", "port")):
+            continue
+        for row in table_rows:
+            name = _cell(row, header, "service", "name")
+            if not name:
+                continue
+            ready = _cell(row, header, "ready endpoint")
+            rows.append(
+                DbService(
+                    name=name,
+                    namespace=namespace,
+                    type=_cell(row, header, "type") or "ClusterIP",
+                    port=_cell(row, header, "port"),
+                    cluster_ip=_cell(row, header, "cluster ip"),
+                    external_ip=_cell(row, header, "external ip"),
+                    ready_endpoint=ready,
+                    database=_cell(row, header, "database"),
+                    username=_cell(row, header, "username"),
+                    status="OK" if _known(ready) else "WARNING",
+                )
+            )
+    return rows
+
+
+def _kafka_bootstrap(name: str, namespace: str, ports: str) -> str:
+    """Turn `kafka:9093` into a usable `kafka.<ns>.svc:9093` candidate."""
+    first = ports.split(",")[0].strip() if ports else ""
+    if not first:
+        return ""
+    _, _, port = first.partition(":")
+    if not port.isdigit():
+        return ""
+    host = f"{name}.{namespace}.svc" if namespace else name
+    return f"{host}:{port}"
+
+
+def normalize_kafka_services(lines: list[str], namespace: str = "") -> list[KafkaService]:
+    """Parse the engine's Kafka discovery table (`SERVICE TYPE CLUSTER IP PORTS`)."""
+    rows: list[KafkaService] = []
+    for header, table_rows in extract_tables(lines):
+        low = [h.lower() for h in header]
+        if "service" not in low or "ports" not in low:
+            continue
+        for row in table_rows:
+            name = _cell(row, header, "service", "name")
+            if not name:
+                continue
+            ports = _cell(row, header, "ports")
+            rows.append(
+                KafkaService(
+                    name=name,
+                    namespace=namespace,
+                    type=_cell(row, header, "type") or "ClusterIP",
+                    cluster_ip=_cell(row, header, "cluster ip"),
+                    ports=ports,
+                    bootstrap=_kafka_bootstrap(name, namespace, ports),
+                    status="OK" if ports else "WARNING",
+                )
+            )
+    return rows
 
 
 # --------------------------------------------------------------------------

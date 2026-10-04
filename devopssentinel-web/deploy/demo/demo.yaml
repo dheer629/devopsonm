@@ -17,6 +17,19 @@ spec:
     requests:
       storage: 1Gi
 ---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: demo-cache
+  labels:
+    devopssentinel.io/demo: "true"
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: 512Mi
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -46,6 +59,8 @@ spec:
           volumeMounts:
             - name: data
               mountPath: /data
+            - name: cache
+              mountPath: /cache
           readinessProbe:
             httpGet:
               path: /healthz
@@ -56,6 +71,9 @@ spec:
         - name: data
           persistentVolumeClaim:
             claimName: demo-data
+        - name: cache
+          persistentVolumeClaim:
+            claimName: demo-cache
 ---
 apiVersion: v1
 kind: Service

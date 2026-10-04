@@ -7,12 +7,12 @@ frontend served from the production `dist/` build.
 
 | Layer | Command | Result |
 | --- | --- | --- |
-| Backend unit + API contract | `python -m pytest -q` | **64 passed** |
+| Backend unit + API contract | `python -m pytest -q` | **70 passed** |
 | Frontend typecheck (strict) | `cd frontend && npm run typecheck` | **clean** |
 | Frontend unit | `cd frontend && npx vitest run` | **18 passed** (4 files) |
-| Frontend production build | `cd frontend && npm run build` | **built** (840 kB JS / 43 kB CSS; 261 kB / 8 kB gzip) |
-| Browser E2E (dark + light) | `cd frontend && npx playwright test` | **62 passed** (31 tests × 2 themes) |
-| Accessibility (axe) | `cd frontend && npx playwright test e2e/a11y.spec.ts` | **20 passed** (10 routes × 2 themes) |
+| Frontend production build | `cd frontend && npm run build` | **built** (887 kB JS / 52 kB CSS; 272 kB / 10 kB gzip) |
+| Browser E2E (dark + light) | `cd frontend && npx playwright test` | **68 passed** (34 tests × 2 themes) |
+| Accessibility (axe) | `cd frontend && npx playwright test e2e/a11y.spec.ts` | **24 passed** (12 routes × 2 themes) |
 | Live server smoke | `uvicorn app.main:app` + HTTP checks | `/api/v1/version` 200, `/api/v1/system` 200, `/` and `/workloads` 200, fail-safe operation returns `UNAVAILABLE` envelope (not 500) |
 
 ### Defects found and fixed during validation
@@ -46,6 +46,9 @@ frontend served from the production `dist/` build.
 * Command palette opens with `Ctrl+K` and finds resources.
 * GitOps page exposes **no** Reconcile/Suspend/Resume/Rollback/Upgrade control.
 * PKI posture, topology inspector, storage/network inventories, doctor matrix, settings exports.
+* Database and Kafka pages render parsed tables, a **Data** view joining each service to its backing
+  pods/PVCs, and an explicit availability panel that states what row-level / topic data can and
+  cannot be read (and the exact console command).
 * Unknown routes render an explicit `UNAVAILABLE` state; refresh preserves the route; `g d` chord
   navigates.
 * Incident workspace shows `INCIDENT MODE`, keeps operator notes local and lists evidence files.

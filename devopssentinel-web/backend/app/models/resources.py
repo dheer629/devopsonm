@@ -111,6 +111,34 @@ class PVC(BaseModel):
     storage_class: str = ""
     volume: str = ""
     severity: Severity = "OK"
+    consumers: list[str] = Field(default_factory=list)
+
+
+class DbService(BaseModel):
+    """A discovered PostgreSQL / generic database Service (metadata only)."""
+
+    name: str
+    namespace: str = ""
+    type: str = "ClusterIP"
+    port: str = ""
+    cluster_ip: str = ""
+    external_ip: str = ""
+    ready_endpoint: str = ""
+    database: str = ""
+    username: str = ""
+    status: Severity = "UNKNOWN"
+
+
+class KafkaService(BaseModel):
+    """A discovered Kafka broker Service plus its bootstrap candidate."""
+
+    name: str
+    namespace: str = ""
+    type: str = "ClusterIP"
+    cluster_ip: str = ""
+    ports: str = ""
+    bootstrap: str = ""
+    status: Severity = "UNKNOWN"
 
 
 class GraphNode(BaseModel):

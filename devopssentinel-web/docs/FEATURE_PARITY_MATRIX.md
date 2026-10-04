@@ -25,10 +25,10 @@ Legend
 | `--triage` | SUPPORTED | `/findings`, `/events` (`workloads.triage`) | Findings queue + event table/timeline |
 | `--triage-workload KIND/NAME` | SUPPORTED | `/workloads/pods/:name` (`workloads.triage_workload`) | Pod detail, containers, events, logs |
 | `--network` | SUPPORTED | `/network` (`network.topology`) | Services, endpoint gaps, port path |
-| `--storage` | SUPPORTED | `/storage` (`storage.dependencies`) | PVC center, mount warnings, consumers |
+| `--storage` | SUPPORTED | `/storage` (`storage.dependencies`) | PVC centre: namespace, status, capacity, StorageClass, volume **and the consuming pod** |
 | `--etdp` | PARTIAL | `/etdp` (`etdp.platform`) | Grouping text rendered; engine emits text, not grouped JSON |
-| `--postgres-discovery` | PARTIAL | `/database` (`database.postgres`) | Discovery text only; interactive queries are CLI ONLY |
-| `--kafka-discovery` | PARTIAL | `/kafka` (`kafka.discovery`) | Discovery text only; no credentials exposed |
+| `--postgres-discovery` | SUPPORTED | `/database` (`database.postgres`, `database.services`) | **Services** table (service, type, port, cluster IP, ready endpoint, status), **Data** view joining each database to its backing pod + PVCs, **Report**/**Raw**. Row-level SQL stays CLI ONLY |
+| `--kafka-discovery` | SUPPORTED | `/kafka` (`kafka.discovery`, `kafka.services`) | **Brokers** table with bootstrap candidates, **Topics** availability panel (CLI/broker status + exact command), **Data** view with backing pods, **Report**/**Raw** |
 | `--doctor` | SUPPORTED | `/doctor` (`system.doctor`) | Capability matrix parsed into rows + raw view |
 | `--capabilities` | SUPPORTED | `/api/v1/capabilities` (`system.capabilities`) | Parsed capability rows |
 | `--dependency TYPE/NAME` | SUPPORTED | `/topology`, `/api/v1/graph/...`, `/api/v1/impact/...` | Graph, reverse dependencies, failure path |
@@ -52,8 +52,8 @@ Legend
 | Interactive pod log follow / `previous` / container selection | PARTIAL | Adapter exposes report-captured lines with `PARTIAL` status and an explicit warning; the engine's live follower is CLI ONLY |
 | Full log center (raw cache, summary, audit log) | PARTIAL | Audit trail + diagnostics exposed; terminal pager is CLI ONLY |
 | Live TLS probe / certificate-vs-endpoint comparison | CLI ONLY | `POST /api/v1/tls/inspect` returns `UNAVAILABLE` with a reason instead of opening arbitrary sockets from browser input |
-| Interactive read-only PostgreSQL session | CLI ONLY | Credentials must never traverse the browser; discovery remains available |
-| Kafka interactive tools | CLI ONLY | Same reason |
+| Interactive read-only PostgreSQL session | CLI ONLY | Credentials must never traverse the browser. `/database` shows the Services table, the backing pods/PVCs and an explicit availability panel with the exact console command |
+| Kafka interactive tools | CLI ONLY | Same reason. `/kafka` shows brokers, bootstrap candidates and a **Topics availability** panel that states what can and cannot be read |
 | Incident session + exports under `~/.devopssentinel/evidence/ID` | SUPPORTED | `/incidents/:id` workspace (notes + evidence + pins + exports), `/evidence`, `/api/v1/notes/{id}`, `--incident` launcher flag |
 | PRE / POST change validation | SUPPORTED | `/baselines` (`GET/POST /api/v1/baselines`, `POST /api/v1/baselines/compare`) with UNCHANGED / IMPROVED / DEGRADED / NEW / REMOVED classification |
 | `export_center` | SUPPORTED | `/exports` page + `/settings` + `GET /api/v1/exports/{domain}` (JSON/CSV/NDJSON) |
@@ -87,6 +87,7 @@ Legend
 | Addition | Rationale |
 | --- | --- |
 | `GET /api/v1/contexts`, `/namespaces` | Two narrowly-scoped read-only kubectl discovery calls; the engine exposes no list mode |
+| `GET /api/v1/database/services`, `/kafka/services` | Structured views of the engine's own discovery tables (metadata only) so the pages can render tables instead of raw text |
 | `GET /api/v1/system`, `/session`, `/diagnostics` | Web-only surface (versions, cache stats, audit trail) |
 | Pins, history, notes, baselines | Local operator convenience under `~/.devopssentinel-web` |
 | Export formatting (CSV/NDJSON) | Browser download convenience; values come from the engine unchanged |
@@ -95,8 +96,8 @@ Legend
 
 | Status | Count |
 | --- | --- |
-| SUPPORTED | 18 |
-| PARTIAL | 11 |
+| SUPPORTED | 20 |
+| PARTIAL | 9 |
 | CLI ONLY | 4 |
 | BLOCKED | 6 |
 | NOT APPLICABLE | 4 |

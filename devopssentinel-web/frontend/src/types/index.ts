@@ -119,6 +119,30 @@ export interface PVCResource {
   storage_class: string;
   volume: string;
   severity: string;
+  consumers: string[];
+}
+
+export interface DbServiceResource {
+  name: string;
+  namespace: string;
+  type: string;
+  port: string;
+  cluster_ip: string;
+  external_ip: string;
+  ready_endpoint: string;
+  database: string;
+  username: string;
+  status: string;
+}
+
+export interface KafkaServiceResource {
+  name: string;
+  namespace: string;
+  type: string;
+  cluster_ip: string;
+  ports: string;
+  bootstrap: string;
+  status: string;
 }
 
 export interface GraphNode {

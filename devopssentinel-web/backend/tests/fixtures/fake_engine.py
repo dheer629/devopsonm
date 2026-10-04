@@ -146,8 +146,22 @@ REPORTS = {
         "Kustomization/devopsonm -> HelmRelease/transformer: NO_DRIFT_EVIDENCE",
     ],
     "etdp": ["Log Transformer -> TLS Secret -> CA Bundle -> Service"],
-    "postgres-discovery": ["Service pg-svc ClusterIP 10.0.0.9 5432 ready"],
-    "kafka-discovery": ["Bootstrap kafka:9093 TLS=true"],
+    "postgres-discovery": [
+        "POSTGRESQL / GENERIC DB DISCOVERY | namespace=devopsonm",
+        "SERVICE\tTYPE\tPORT\tCLUSTER IP\tEXTERNAL IP\tREADY ENDPOINT\tDATABASE\tUSERNAME",
+        "pg-svc\tClusterIP\t5432\t10.0.0.9\t\t10.0.0.10\tUNKNOWN (safe metadata only)\t"
+        "UNKNOWN (credential not read)",
+        "stale-db\tClusterIP\t5432\t10.0.0.12\t\tUNKNOWN\tUNKNOWN (safe metadata only)\t"
+        "UNKNOWN (credential not read)",
+    ],
+    "kafka-discovery": [
+        "KAFKA DIAGNOSTICS DISCOVERY | namespace=devopsonm",
+        "kafka-topics          : TOOL_MISSING",
+        "kafka-consumer-groups : TOOL_MISSING",
+        "",
+        "SERVICE\tTYPE\tCLUSTER IP\tPORTS",
+        "kafka\tClusterIP\t10.0.0.11\tkafka:9093",
+    ],
 }
 
 

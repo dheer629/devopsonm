@@ -14,6 +14,8 @@ const ROUTES = [
   "/baselines",
   "/exports",
   "/incidents/INC12345",
+  "/database",
+  "/kafka",
 ];
 
 test.beforeEach(async ({ page }) => {

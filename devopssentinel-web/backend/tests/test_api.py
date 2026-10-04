@@ -86,6 +86,20 @@ def test_pod_events_endpoint_returns_normalized_rows(client):
     assert isinstance(response.json()["envelope"]["data"], list)
 
 
+def test_database_and_kafka_structured_views(client):
+    """The Database / Kafka pages render tables, not just report text."""
+    db = client.get("/api/v1/database/services", params=SCOPE).json()["envelope"]
+    by_name = {row["name"]: row for row in db["data"]}
+    assert by_name["pg-svc"]["port"] == "5432"
+    assert by_name["pg-svc"]["ready_endpoint"] == "10.0.0.10"
+    assert by_name["pg-svc"]["status"] == "OK"
+    assert by_name["stale-db"]["status"] == "WARNING"
+
+    kafka = client.get("/api/v1/kafka/services", params=SCOPE).json()["envelope"]
+    assert kafka["data"][0]["name"] == "kafka"
+    assert kafka["data"][0]["bootstrap"] == "kafka.devopsonm.svc:9093"
+
+
 def test_doctor_capabilities(client):
     env = client.get("/api/v1/doctor", params=SCOPE).json()["envelope"]
     assert env["data"]

@@ -6,6 +6,7 @@ import { EmptyState } from "@/components/common";
 import { TooltipProvider } from "@/components/ui/primitives";
 import { BaselinePage } from "@/features/baselines/BaselinePage";
 import { DashboardPage } from "@/features/dashboard/DashboardPage";
+import { DatabasePage } from "@/features/database/DatabasePage";
 import { DoctorPage } from "@/features/doctor/DoctorPage";
 import { EvidencePage } from "@/features/evidence/EvidencePage";
 import { EventsPage } from "@/features/events/EventsPage";
@@ -13,6 +14,7 @@ import { ExportsPage } from "@/features/exports/ExportsPage";
 import { FindingsPage } from "@/features/findings/FindingsPage";
 import { GitOpsPage } from "@/features/gitops/GitOpsPage";
 import { IncidentPage } from "@/features/incidents/IncidentPage";
+import { KafkaPage } from "@/features/kafka/KafkaPage";
 import { NetworkPage } from "@/features/network/NetworkPage";
 import { PkiPage } from "@/features/pki/PkiPage";
 import { ReportPage } from "@/features/reports/ReportPage";
@@ -62,8 +64,8 @@ export function App() {
                 <Route path="/pki" element={<PkiPage />} />
                 <Route path="/network" element={<NetworkPage />} />
                 <Route path="/storage" element={<StoragePage />} />
-                <Route path="/database" element={<ReportPage kind="database" />} />
-                <Route path="/kafka" element={<ReportPage kind="kafka" />} />
+                <Route path="/database" element={<DatabasePage />} />
+                <Route path="/kafka" element={<KafkaPage />} />
                 <Route path="/etdp" element={<ReportPage kind="etdp" />} />
                 <Route path="/findings" element={<FindingsPage />} />
                 <Route path="/incidents/:id" element={<IncidentPage />} />

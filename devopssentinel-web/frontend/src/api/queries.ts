@@ -5,12 +5,14 @@ import type {
   BaselineComparison,
   BaselineSummary,
   Certificate,
+  DbServiceResource,
   Envelope,
   EventResource,
   Finding,
   GitOpsObject,
   Graph,
   HistoryItem,
+  KafkaServiceResource,
   LogBundle,
   NoteItem,
   OperationResponse,
@@ -44,6 +46,9 @@ export const keys = {
   etdp: (s: Scope) => ["etdp", s.context ?? "", s.namespace ?? ""] as const,
   database: (s: Scope) => ["database", s.context ?? "", s.namespace ?? ""] as const,
   kafka: (s: Scope) => ["kafka", s.context ?? "", s.namespace ?? ""] as const,
+  databaseServices: (s: Scope) =>
+    ["database-services", s.context ?? "", s.namespace ?? ""] as const,
+  kafkaServices: (s: Scope) => ["kafka-services", s.context ?? "", s.namespace ?? ""] as const,
   pins: () => ["pins"] as const,
   history: () => ["history"] as const,
   diagnostics: () => ["diagnostics"] as const,
@@ -233,6 +238,28 @@ export function useDatabase(scope: Scope, enabled = true) {
 export function useKafka(scope: Scope, enabled = true) {
   return useQuery<OperationResponse<string>>({
     ...opQuery<string>(keys.kafka(scope), "/api/v1/kafka", scope),
+    enabled,
+  });
+}
+
+export function useDatabaseServices(scope: Scope, enabled = true) {
+  return useQuery<OperationResponse<DbServiceResource[]>>({
+    ...opQuery<DbServiceResource[]>(
+      keys.databaseServices(scope),
+      "/api/v1/database/services",
+      scope,
+    ),
+    enabled,
+  });
+}
+
+export function useKafkaServices(scope: Scope, enabled = true) {
+  return useQuery<OperationResponse<KafkaServiceResource[]>>({
+    ...opQuery<KafkaServiceResource[]>(
+      keys.kafkaServices(scope),
+      "/api/v1/kafka/services",
+      scope,
+    ),
     enabled,
   });
 }

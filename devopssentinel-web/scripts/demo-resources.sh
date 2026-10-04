@@ -36,7 +36,33 @@ if [[ "$ACTION" == "down" ]]; then
     exit 0
 fi
 
-[[ "$ACTION" == "up" ]] || { printf 'usage: %s {up|down} [NAMESPACE]\n' "$0" >&2; exit 2; }
+if [[ "$ACTION" == "pvc" ]]; then
+    # scripts/demo-resources.sh pvc <namespace> <name> [size]
+    NAME="${3:-demo-pvc}"
+    SIZE="${4:-1Gi}"
+    log "creating PersistentVolumeClaim $NAME ($SIZE) in $NS"
+    kubectl apply -n "$NS" -f - <<YAML
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: $NAME
+  labels:
+    devopssentinel.io/demo: "true"
+spec:
+  accessModes: ["ReadWriteOnce"]
+  storageClassName: local-path
+  resources:
+    requests:
+      storage: $SIZE
+YAML
+    kubectl -n "$NS" get pvc "$NAME" || true
+    log "note: the local-path provisioner binds on first consumer, so a PVC with no"
+    log "      consuming pod stays Pending — which the Storage page reports as WARNING."
+    log "done"
+    exit 0
+fi
+
+[[ "$ACTION" == "up" ]] || { printf 'usage: %s {up|down|pvc} [NAMESPACE] [NAME] [SIZE]\n' "$0" >&2; exit 2; }
 
 log "applying demo fixtures to namespace $NS"
 kubectl apply -n "$NS" -f "$MANIFEST"

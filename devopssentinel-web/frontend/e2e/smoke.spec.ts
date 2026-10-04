@@ -73,6 +73,21 @@ test("storage and network pages render inventories", async ({ page }) => {
   await expect(page.getByText("syslog-svc").first()).toBeVisible();
 });
 
+test("database and kafka pages render tables and data availability", async ({ page }) => {
+  await page.goto("/database");
+  await expect(page.getByRole("heading", { name: "Database" })).toBeVisible();
+  await expect(page.getByText("pg-svc").first()).toBeVisible();
+  await expect(page.getByText("Row-level data").first()).toBeVisible();
+  // The Data view joins the discovered database to its backing pod.
+  await page.getByRole("tab", { name: "Data" }).click();
+  await expect(page.getByText("transformer-abc").first()).toBeVisible();
+
+  await page.goto("/kafka");
+  await expect(page.getByRole("heading", { name: "Kafka" })).toBeVisible();
+  await expect(page.getByText("kafka.devopsonm.svc:9093").first()).toBeVisible();
+  await expect(page.getByText("Topic data availability").first()).toBeVisible();
+});
+
 test("doctor page renders the capability matrix", async ({ page }) => {
   await page.goto("/doctor");
   await expect(page.getByRole("heading", { name: "Doctor" })).toBeVisible();

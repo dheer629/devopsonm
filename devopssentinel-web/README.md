@@ -69,6 +69,7 @@ legitimately reports nothing. To exercise **all** pages end to end, deploy the b
 ```bash
 scripts/demo-resources.sh up   default     # default namespace is `default`
 scripts/demo-resources.sh down default     # one-command cleanup
+scripts/demo-resources.sh pvc  <namespace> <name> [size]   # standalone PVC
 ```
 
 This creates a labelled (`devopssentinel.io/demo=true`) set of *real* objects, using only images
@@ -77,11 +78,15 @@ already present in the cluster:
 | Page | Fixture |
 | --- | --- |
 | Workloads / Pods / Events / Topology | `Deployment/demo-web` (podinfo) + `Deployment/demo-postgres` |
-| Storage | `PersistentVolumeClaim/demo-data` (bound by the web pod) |
+| Storage | `PersistentVolumeClaim/demo-data` (1Gi) and `demo-cache` (512Mi), both bound by `demo-web`, so the consuming pod is reported |
 | Network | `Service/demo-web`, `Service/postgres`, `Service/kafka` with live endpoints |
 | Database | `Service/postgres` → ready endpoint reported by `--postgres-discovery` |
-| Kafka | `Service/kafka` → reported by `--kafka-discovery` |
+| Kafka | `Service/kafka` → reported by `--kafka-discovery`, with a `kafka.<ns>.svc:9093` bootstrap candidate |
 | PKI / TLS | `Secret/demo-tls` (`kubernetes.io/tls`, locally generated, 365 days) |
+
+`pvc <namespace> <name>` creates a standalone PVC anywhere. The `local-path` provisioner binds on
+first consumer, so a PVC with no consuming pod stays `Pending` — which the Storage page reports as
+`WARNING` rather than hiding it.
 
 The read-only adapter is unaffected: the script performs the explicitly scoped setup, exactly like the
 `devopssentinel-e2e/` harness.
@@ -108,15 +113,17 @@ The read-only adapter is unaffected: the script performs the explicitly scoped s
 | Topology graph (React Flow), impact/reverse dependencies, failure-path filter | ✅ |
 | GitOps command center (sources → Kustomization → HelmRelease chain) | ✅ |
 | PKI / TLS dashboard, expiry posture, consumer/reference tracing | ✅ |
-| Network services + endpoint gaps, Storage PVC center | ✅ |
-| ETDP / Database / Kafka / Smart Health report views | ✅ |
+| Network services + endpoint gaps, Storage PVC centre (namespace, capacity, StorageClass, consuming pod) | ✅ |
+| Database page: Services table, Data view (backing pods + PVCs), Report/Raw + availability panel | ✅ |
+| Kafka page: Brokers table with bootstrap candidates, Topics availability, Data view, Report/Raw | ✅ |
+| ETDP / Smart Health report views | ✅ |
 | Incident workspace (`/incidents/:id`), PRE/POST baseline comparison (`/baselines`), Exports page (`/exports`) | ✅ |
 | Doctor capability matrix, Settings, pins, history, local exports (JSON/CSV/NDJSON) | ✅ |
 | Command palette (Ctrl+K, `/`), keyboard chords (`g d`, `g p`, …) | ✅ |
 | 7 professional themes (5 dark / 2 light) + system auto, swatch picker, bubble surface language | ✅ |
 | Virtualized tables (5,000-row inventory test), status = icon + text + colour | ✅ |
 | SSE endpoints for live refresh and streamed logs | ✅ |
-| pytest (64), Vitest (18), Playwright smoke + axe (frontend-only, fixture-backed) | ✅ |
+| pytest (70), Vitest (18), Playwright smoke + axe (frontend-only, fixture-backed) | ✅ |
 | Live TLS inspection, interactive logs, DB/Kafka credential prompts | ⛔ CLI only (see parity matrix) |
 
 See **[docs/FEATURE_PARITY_MATRIX.md](docs/FEATURE_PARITY_MATRIX.md)** for the complete

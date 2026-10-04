@@ -13,10 +13,12 @@ from app.services.parsers import (
     extract_tables,
     normalize_capabilities,
     normalize_certificates,
+    normalize_db_services,
     normalize_dependency_graph,
     normalize_events,
     normalize_findings,
     normalize_gitops,
+    normalize_kafka_services,
     normalize_logs,
     normalize_pods,
     normalize_pvcs,
@@ -324,6 +326,9 @@ def test_normalize_pvcs_from_real_storage_tree() -> None:
     assert by_name["backend-data"].volume.startswith("pvc-bfe51ed5")
     assert by_name["backend-data"].severity == "OK"
     assert by_name["postgres-data"].storage_class == "local-path"
+    # The tree names the consuming pod, so storage rows can show their owner.
+    assert by_name["backend-data"].consumers == ["backend-65cf6b455b-9nps9"]
+    assert by_name["postgres-data"].consumers == ["postgres-64cdc79784-8ggfz"]
 
 
 CERT_BLOCK = [
@@ -378,6 +383,59 @@ def test_certificate_consumers_from_mount_references() -> None:
     ]
     certs = normalize_certificates(lines, "default")
     assert certs[0].consumers == 1
+
+
+# --------------------------------------------------------------------------
+# Database / Kafka discovery tables
+# --------------------------------------------------------------------------
+
+DB_TABLE = [
+    "POSTGRESQL / GENERIC DB DISCOVERY | namespace=default",
+    "SERVICE\tTYPE\tPORT\tCLUSTER IP\tEXTERNAL IP\tREADY ENDPOINT\tDATABASE\tUSERNAME",
+    "kafka\tClusterIP\t9093\t10.109.53.81\t\t10.244.0.161\tUNKNOWN (safe metadata only)\t"
+    "UNKNOWN (credential not read)",
+    "postgres\tClusterIP\t5432\t10.100.141.34\t\t10.244.0.161\tUNKNOWN (safe metadata only)\t"
+    "UNKNOWN (credential not read)",
+    "stale-db\tClusterIP\t5432\t10.100.141.99\t\tUNKNOWN\tUNKNOWN (safe metadata only)\t"
+    "UNKNOWN (credential not read)",
+]
+
+KAFKA_TABLE = [
+    "KAFKA DIAGNOSTICS DISCOVERY | namespace=default",
+    "kafka-topics          : TOOL_MISSING",
+    "kafka-consumer-groups : TOOL_MISSING",
+    "",
+    "SERVICE\tTYPE\tCLUSTER IP\tPORTS",
+    "kafka\tClusterIP\t10.109.53.81\tkafka:9093",
+]
+
+
+def test_normalize_db_services_from_real_table() -> None:
+    rows = normalize_db_services(DB_TABLE, "default")
+    by_name = {r.name: r for r in rows}
+    assert len(rows) == 3
+    assert by_name["postgres"].port == "5432"
+    assert by_name["postgres"].cluster_ip == "10.100.141.34"
+    assert by_name["postgres"].ready_endpoint == "10.244.0.161"
+    assert by_name["postgres"].namespace == "default"
+    assert by_name["postgres"].status == "OK"
+    # A service with no ready endpoint is surfaced, not hidden.
+    assert by_name["stale-db"].status == "WARNING"
+
+
+def test_normalize_kafka_services_from_real_table() -> None:
+    rows = normalize_kafka_services(KAFKA_TABLE, "default")
+    assert len(rows) == 1
+    assert rows[0].name == "kafka"
+    assert rows[0].ports == "kafka:9093"
+    assert rows[0].bootstrap == "kafka.default.svc:9093"
+    assert rows[0].status == "OK"
+
+
+def test_db_and_kafka_normalizers_do_not_cross_match() -> None:
+    """The DB table has PORT; the Kafka table has PORTS. Never mix them."""
+    assert normalize_kafka_services(DB_TABLE, "default") == []
+    assert normalize_db_services(KAFKA_TABLE, "default") == []
 
 
 # --------------------------------------------------------------------------

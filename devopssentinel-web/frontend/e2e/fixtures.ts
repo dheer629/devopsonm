@@ -201,6 +201,7 @@ export const PVCS = [
     access_modes: "RWO",
     storage_class: "standard",
     volume: "pv-0",
+    consumers: ["transformer-abc"],
     severity: "OK",
   },
   {
@@ -211,7 +212,47 @@ export const PVCS = [
     access_modes: "RWO",
     storage_class: "standard",
     volume: "",
+    consumers: [],
     severity: "WARNING",
+  },
+];
+
+export const DB_SERVICES = [
+  {
+    name: "pg-svc",
+    namespace: "devopsonm",
+    type: "ClusterIP",
+    port: "5432",
+    cluster_ip: "10.0.0.9",
+    external_ip: "",
+    ready_endpoint: "10.0.0.4",
+    database: "UNKNOWN (safe metadata only)",
+    username: "UNKNOWN (credential not read)",
+    status: "OK",
+  },
+  {
+    name: "stale-db",
+    namespace: "devopsonm",
+    type: "ClusterIP",
+    port: "5432",
+    cluster_ip: "10.0.0.12",
+    external_ip: "",
+    ready_endpoint: "UNKNOWN",
+    database: "UNKNOWN (safe metadata only)",
+    username: "UNKNOWN (credential not read)",
+    status: "WARNING",
+  },
+];
+
+export const KAFKA_SERVICES = [
+  {
+    name: "kafka",
+    namespace: "devopsonm",
+    type: "ClusterIP",
+    cluster_ip: "10.0.0.11",
+    ports: "kafka:9093",
+    bootstrap: "kafka.devopsonm.svc:9093",
+    status: "OK",
   },
 ];
 
@@ -238,7 +279,7 @@ export const SYSTEM = {
   kubeconfig: "/home/user/.kube/config",
   incidentId: null,
   debug: false,
-  capabilities: { kubectl: true, jq: true, flux: true, helm: true, openssl: true },
+  capabilities: { kubectl: true, jq: true, flux: true, helm: true, openssl: true, psql: false, kafka: false },
   operations: [],
   evidenceIncidents: 0,
 };
@@ -305,8 +346,14 @@ export async function installFixtures(page: Page): Promise<void> {
         raw: rawEvidence(),
       });
     }
+    if (path.endsWith("/database/services")) {
+      return json({ envelope: envelope(DB_SERVICES), raw: rawEvidence() });
+    }
     if (path.endsWith("/database")) {
       return json({ envelope: envelope("pg-svc ClusterIP 5432 ready"), raw: rawEvidence() });
+    }
+    if (path.endsWith("/kafka/services")) {
+      return json({ envelope: envelope(KAFKA_SERVICES), raw: rawEvidence() });
     }
     if (path.endsWith("/kafka")) {
       return json({ envelope: envelope("kafka:9093 TLS=true"), raw: rawEvidence() });

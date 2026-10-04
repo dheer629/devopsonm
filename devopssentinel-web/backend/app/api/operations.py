@@ -10,8 +10,10 @@ from ..models import make_envelope
 from ..security import validate_incident_id, validate_name
 from ..services import evidence as evidence_svc
 from ..services.parsers import (
+    normalize_db_services,
     normalize_events,
     normalize_findings,
+    normalize_kafka_services,
     normalize_pods,
 )
 from ..services.sessions import sessions
@@ -58,9 +60,33 @@ async def database(sc: Scope = Depends(scope)) -> dict:
     return await invoke("database.postgres", sc)
 
 
+@router.get("/database/services")
+async def database_services(sc: Scope = Depends(scope)) -> dict:
+    """Structured view of the discovered database Services (metadata only)."""
+    return await invoke(
+        "database.postgres",
+        sc,
+        normalizer=lambda lines, ns: [
+            d.model_dump() for d in normalize_db_services(lines, ns)
+        ],
+    )
+
+
 @router.get("/kafka")
 async def kafka(sc: Scope = Depends(scope)) -> dict:
     return await invoke("kafka.discovery", sc)
+
+
+@router.get("/kafka/services")
+async def kafka_services(sc: Scope = Depends(scope)) -> dict:
+    """Structured view of the discovered Kafka broker Services + bootstrap."""
+    return await invoke(
+        "kafka.discovery",
+        sc,
+        normalizer=lambda lines, ns: [
+            k.model_dump() for k in normalize_kafka_services(lines, ns)
+        ],
+    )
 
 
 @router.get("/search")

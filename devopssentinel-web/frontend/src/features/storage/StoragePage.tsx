@@ -48,6 +48,18 @@ export function StoragePage() {
         header: "Volume",
         cell: (info) => <span className="mono">{String(info.getValue() || "—")}</span>,
       },
+      {
+        accessorKey: "consumers",
+        header: "Consumers",
+        cell: (info) => {
+          const list = (info.getValue() as string[]) ?? [];
+          return (
+            <span className="mono" title={list.join(", ")}>
+              {list.length ? list.join(", ") : "—"}
+            </span>
+          );
+        },
+      },
     ],
     [],
   );
