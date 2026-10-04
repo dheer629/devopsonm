@@ -66,12 +66,19 @@ export const THEMES: ThemeDef[] = [
     hint: "Warm low-glare paper tone",
     swatch: ["#fbf4e4", "#fffdf6", "#2077b4"],
   },
+  {
+    id: "kubernetes",
+    label: "Kubernetes",
+    kind: "light",
+    hint: "Kubernetes Dashboard: flat white cards, indigo toolbar",
+    swatch: ["#f5f5f5", "#ffffff", "#3f51b5"],
+  },
 ];
 
 const BY_ID = new Map(THEMES.map((theme) => [theme.id, theme]));
 
 export const DEFAULT_DARK = "midnight";
-export const DEFAULT_LIGHT = "graphite";
+export const DEFAULT_LIGHT = "kubernetes";
 
 /** Resolve the concrete theme for a stored preference (may be "system"). */
 export function resolveTheme(theme: string, prefersDark: boolean): ThemeDef {

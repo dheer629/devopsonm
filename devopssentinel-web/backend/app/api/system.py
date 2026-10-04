@@ -93,6 +93,53 @@ async def namespaces(
     ).model_dump()
 
 
+@router.get("/metrics/nodes")
+async def metrics_nodes(context: str = Query("")) -> dict:
+    """Read-only `kubectl top nodes`.
+
+    UNAVAILABLE (not an error page) when the Metrics API is not installed.
+    """
+    try:
+        rows = await kube.top_nodes(context)
+    except (kube.KubeError, ValueError) as exc:
+        return make_envelope(
+            {"nodes": []},
+            context=context,
+            source="UNAVAILABLE",
+            status="UNAVAILABLE",
+            errors=[str(exc)],
+        ).model_dump()
+    return make_envelope(
+        {"nodes": rows},
+        context=context,
+        source="LIVE",
+        status="OK" if rows else "UNKNOWN",
+    ).model_dump()
+
+
+@router.get("/metrics/pods")
+async def metrics_pods(context: str = Query(""), namespace: str = Query("")) -> dict:
+    """Read-only `kubectl top pods` for one namespace."""
+    try:
+        rows = await kube.top_pods(context, namespace)
+    except (kube.KubeError, ValueError) as exc:
+        return make_envelope(
+            {"pods": []},
+            context=context,
+            namespace=namespace,
+            source="UNAVAILABLE",
+            status="UNAVAILABLE",
+            errors=[str(exc)],
+        ).model_dump()
+    return make_envelope(
+        {"pods": rows},
+        context=context,
+        namespace=namespace,
+        source="LIVE",
+        status="OK" if rows else "UNKNOWN",
+    ).model_dump()
+
+
 @router.get("/session")
 async def session_info(sc: Scope = Depends(scope)) -> dict:
     from ..services.sessions import sessions

@@ -65,3 +65,10 @@ queue, pod/log/event investigation, dependency topology, GitOps and PKI dashboar
 storage centers, incident evidence browsing and local exports. The complete per-feature accounting
 lives in [`devopssentinel-web/docs/FEATURE_PARITY_MATRIX.md`](devopssentinel-web/docs/FEATURE_PARITY_MATRIX.md).
 
+**Interface.** Eight themes ship in the picker; `Kubernetes` reproduces the Kubernetes Dashboard
+layout — an indigo breadcrumb band, a sectioned sidebar with an inline namespace picker, flat white
+cards and sortable tables with inline usage bars. The default follows the OS colour scheme. Live
+CPU/memory usage comes from two read-only `kubectl top` calls (`/api/v1/metrics/nodes`,
+`/api/v1/metrics/pods`); without metrics-server the pages say so instead of failing. See
+[`devopssentinel-web/docs/SECURITY.md`](devopssentinel-web/docs/SECURITY.md).
+

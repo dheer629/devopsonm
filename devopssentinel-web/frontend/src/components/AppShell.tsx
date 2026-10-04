@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Outlet, useNavigate } from "react-router-dom";
 
 import { CommandPalette } from "@/components/CommandPalette";
+import { Breadcrumbs } from "@/components/Breadcrumbs";
 import { Inspector } from "@/components/Inspector";
 import { Sidebar } from "@/components/Sidebar";
 import { StatusBar } from "@/components/StatusBar";
@@ -74,9 +75,10 @@ export function AppShell() {
   return (
     <div className="flex h-full flex-col">
       <TopBar onOpenPalette={() => setPaletteOpen(true)} />
+      <Breadcrumbs />
       <div className="flex min-h-0 flex-1">
         <Sidebar />
-        <main className="min-w-0 flex-1 overflow-y-auto scroll-thin p-3">
+        <main className="min-w-0 flex-1 overflow-y-auto scroll-thin p-3 lg:p-4">
           <Outlet />
         </main>
         <Inspector />

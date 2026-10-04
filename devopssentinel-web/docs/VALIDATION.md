@@ -7,13 +7,14 @@ frontend served from the production `dist/` build.
 
 | Layer | Command | Result |
 | --- | --- | --- |
-| Backend unit + API contract | `python -m pytest -q` | **114 passed** |
+| Backend unit + API contract | `python -m pytest -q` | **134 passed** |
 | Frontend typecheck (strict) | `cd frontend && npm run typecheck` | **clean** |
-| Frontend unit | `cd frontend && npx vitest run` | **18 passed** (4 files) |
-| Frontend production build | `cd frontend && npm run build` | **built** (896 kB JS / 53 kB CSS; 274 kB / 10 kB gzip) |
-| Browser E2E (dark + light) | `cd frontend && npx playwright test` | **68 passed** (34 tests × 2 themes) |
+| Frontend unit | `cd frontend && npx vitest run` | **25 passed** (5 files) |
+| Frontend production build | `cd frontend && npm run build` | **built** (905 kB JS / 54 kB CSS; 276 kB / 10 kB gzip) |
+| Browser E2E (dark + light) | `cd frontend && npx playwright test` | **72 passed** (36 tests × 2 themes) |
 | Accessibility (axe) | `cd frontend && npx playwright test e2e/a11y.spec.ts` | **24 passed** (12 routes × 2 themes) |
 | Opt-in live data (real DB + broker) | `scripts/demo-resources.sh up default` then the SQL/Topics tabs | **verified** — see *Opt-in live data validation* |
+| Live usage metrics (real cluster) | `curl /api/v1/metrics/nodes` + `/metrics/pods` against the dev vcluster | **LIVE** — node `dev` 205 m / 2.02 GiB (25 %); per-pod CPU/memory for the three demo pods |
 | Live server smoke | `uvicorn app.main:app` + HTTP checks | `/api/v1/version` 200, `/api/v1/system` 200, `/` and `/workloads` 200, fail-safe operation returns `UNAVAILABLE` envelope (not 500) |
 
 ### Defects found and fixed during validation
@@ -24,6 +25,10 @@ frontend served from the production `dist/` build.
 | `status: "UNAVAILABLE"` was missing from the envelope `Status` literal → HTTP 500 on the missing-engine path | live server smoke test | added to the literal + `test_engine_unavailable_yields_envelope_not_500` |
 | LIVE-refresh `Select` trigger had no accessible name (`button-name`, critical) | axe in both themes | `aria-label` on all select triggers |
 | Fixture served the GitOps list for `/graph/gitops`, crashing the GitOps page | Playwright | reordered fixture matching + defensive graph shape guards in `GitOpsPage`/`TopologyPage` |
+| Semantic colours used as *text* on their own 10 % tint failed AA in the light palette (success badge 4.38:1, active nav item 4.17:1, accent badge 4.12:1) | axe, once the light palette became the `desktop-light` project's theme | darkened the light theme's accent/domain/severity tokens; the vivid Kubernetes blue is kept on the chrome band, which carries white text |
+| The generic `/pods` fixture rule shadowed `/metrics/pods` and returned the wrong envelope shape → the Workloads page threw and unmounted | Playwright (blank page + 30 s click timeout) | metrics routes matched first + defensive optional chaining on the metrics payload |
+| The Memory (bytes) column was **silently clipped** (no overflow, so no scrollbar) at 9 columns | measuring `scrollWidth` vs `clientWidth` on the table region | `min-w-full` on the table + `shrink-0` on the usage label |
+| New theme default was a fixed light palette, so both Playwright projects rendered the same theme | reviewing which theme each project actually exercised | default is now `system`, so `desktop-dark` tests midnight and `desktop-light` tests the light palette |
 
 ## What the backend suite proves
 

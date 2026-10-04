@@ -13,6 +13,7 @@ import {
   resolveTheme,
   DEFAULT_DARK,
   DEFAULT_LIGHT,
+  SYSTEM_THEME,
   type ThemeDef,
   type ThemeKind,
 } from "@/lib/themes";
@@ -67,6 +68,7 @@ const ALL_THEME_CLASSES = [
   "theme-graphite",
   "theme-daylight",
   "theme-solarized",
+  "theme-kubernetes",
 ];
 
 function readLocal(key: string, fallback: string): string {
@@ -86,7 +88,7 @@ function writeLocal(key: string, value: string): void {
 }
 
 export function AppProvider({ children }: { children: ReactNode }) {
-  const [theme, setThemeState] = useState<ThemeMode>(() => readLocal(LS.theme, "midnight"));
+  const [theme, setThemeState] = useState<ThemeMode>(() => readLocal(LS.theme, SYSTEM_THEME));
   const [prefersDark, setPrefersDark] = useState(
     () => window.matchMedia("(prefers-color-scheme: dark)").matches,
   );

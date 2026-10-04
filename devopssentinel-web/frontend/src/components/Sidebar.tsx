@@ -1,105 +1,99 @@
-import {
-  Activity,
-  AlertTriangle,
-  Boxes,
-  ChevronLeft,
-  ChevronRight,
-  Database,
-  Download,
-  FileWarning,
-  Gauge,
-  GitBranch,
-  GitCompare,
-  HardDrive,
-  Layers,
-  Network,
-  Radio,
-  Server,
-  Settings,
-  ShieldCheck,
-  Stethoscope,
-  Waypoints,
-} from "lucide-react";
-import { NavLink } from "react-router-dom";
+import { ChevronLeft, ChevronRight } from "lucide-react";
+import { Link, useLocation } from "react-router-dom";
 
-import { useApp } from "@/state/AppContext";
+import { useNamespaces } from "@/api/queries";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { isActive, NAV_SECTIONS } from "@/lib/nav";
 import { cn } from "@/lib/utils";
+import { useApp } from "@/state/AppContext";
 
-interface NavItem {
-  to: string;
-  label: string;
-  icon: typeof Gauge;
-  domain?: string;
-}
-
-export const NAV_ITEMS: NavItem[] = [
-  { to: "/dashboard", label: "Dashboard", icon: Gauge },
-  { to: "/workloads", label: "Workloads", icon: Boxes, domain: "kubernetes" },
-  { to: "/events", label: "Events", icon: Activity },
-  { to: "/topology", label: "Topology", icon: Waypoints },
-  { to: "/gitops", label: "GitOps", icon: GitBranch, domain: "gitops" },
-  { to: "/pki", label: "PKI / TLS", icon: ShieldCheck, domain: "pki" },
-  { to: "/network", label: "Network", icon: Network, domain: "network" },
-  { to: "/storage", label: "Storage", icon: HardDrive, domain: "storage" },
-  { to: "/database", label: "Database", icon: Database },
-  { to: "/kafka", label: "Kafka", icon: Radio },
-  { to: "/etdp", label: "ETDP", icon: Layers },
-  { to: "/findings", label: "Findings", icon: FileWarning },
-  { to: "/incidents/current", label: "Incidents", icon: AlertTriangle },
-  { to: "/baselines", label: "PRE / POST", icon: GitCompare },
-  { to: "/evidence", label: "Evidence", icon: Server },
-  { to: "/exports", label: "Exports", icon: Download },
-  { to: "/doctor", label: "Doctor", icon: Stethoscope },
-  { to: "/settings", label: "Settings", icon: Settings },
-];
-
+/**
+ * Sectioned navigation, mirroring the Kubernetes Dashboard: a namespace picker
+ * at the top, then muted group headings with their destinations. The namespace
+ * control lives here (not in the top bar) so the top bar stays a brand/search
+ * strip exactly like the reference.
+ */
 export function Sidebar() {
-  const { sidebarCollapsed, toggleSidebar } = useApp();
+  const { sidebarCollapsed, toggleSidebar, namespace, setNamespace, context } = useApp();
+  const { pathname } = useLocation();
+  const namespaces = useNamespaces(context);
+  const namespaceList = namespaces.data?.data.namespaces ?? [];
 
   return (
     <nav
       aria-label="Primary"
       className={cn(
-        "flex shrink-0 flex-col border-r border-border/80 bg-panel/60 backdrop-blur-xl transition-[width]",
+        "flex shrink-0 flex-col overflow-y-auto scroll-thin border-r border-border bg-panel transition-[width]",
         sidebarCollapsed ? "w-14" : "w-56",
       )}
     >
-      <ul className="flex-1 space-y-1 overflow-y-auto scroll-thin p-2">
-        {NAV_ITEMS.map((item) => (
-          <li key={item.to}>
-            <NavLink
-              to={item.to}
-              className={({ isActive }) =>
-                cn(
-                  "group flex items-center gap-2.5 rounded-full px-2.5 py-1.5 text-[12.5px] text-text-muted transition-colors hover:bg-panel-2 hover:text-text",
-                  isActive && "bg-accent-soft font-medium text-accent",
-                )
-              }
-              title={sidebarCollapsed ? item.label : undefined}
-            >
-              <span
-                className={cn(
-                  "flex h-6 w-6 shrink-0 items-center justify-center rounded-full transition-colors",
-                  "bg-panel-2/70 group-hover:bg-panel-2",
-                )}
-              >
-                <item.icon className="h-3.5 w-3.5" aria-hidden="true" />
-              </span>
-              {sidebarCollapsed ? (
-                <span className="sr-only">{item.label}</span>
-              ) : (
-                <span className="truncate">{item.label}</span>
-              )}
-            </NavLink>
-          </li>
+      {!sidebarCollapsed ? (
+        <div className="border-b border-border px-3 py-2">
+          <div className="text-[10.5px] font-semibold uppercase tracking-wider text-text-faint">
+            Namespace
+          </div>
+          <Select value={namespace || undefined} onValueChange={setNamespace}>
+            <SelectTrigger className="mt-1 h-8 w-full" aria-label="Namespace">
+              <SelectValue placeholder="Select namespace" />
+            </SelectTrigger>
+            <SelectContent>
+              {namespaceList.map((item) => (
+                <SelectItem key={item} value={item}>
+                  {item}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      ) : null}
+
+      <div className="flex-1 py-1">
+        {NAV_SECTIONS.map((section) => (
+          <div key={section.id} className="pb-0.5">
+            {sidebarCollapsed ? (
+              <div className="mx-2 my-1.5 border-t border-border" aria-hidden="true" />
+            ) : (
+              <div className="px-3 pb-1 pt-2.5 text-[10.5px] font-semibold uppercase tracking-wider text-text-faint">
+                {section.label}
+              </div>
+            )}
+            <ul>
+              {section.items.map((item) => {
+                const active = isActive(item, pathname);
+                return (
+                  <li key={item.to}>
+                    <Link
+                      to={item.to}
+                      title={sidebarCollapsed ? item.label : undefined}
+                      aria-current={active ? "page" : undefined}
+                      className={cn(
+                        "mx-1 flex items-center gap-2.5 rounded-sm px-2 py-1.5 text-[12.5px] transition-colors",
+                        active
+                          ? "bg-accent-soft font-medium text-accent"
+                          : "text-text-muted hover:bg-panel-2 hover:text-text",
+                      )}
+                    >
+                      <item.icon className="h-4 w-4 shrink-0" aria-hidden="true" />
+                      {sidebarCollapsed ? (
+                        <span className="sr-only">{item.label}</span>
+                      ) : (
+                        <span className="truncate">{item.label}</span>
+                      )}
+                    </Link>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
         ))}
-      </ul>
+      </div>
+
       <button
         type="button"
         onClick={toggleSidebar}
         aria-label={sidebarCollapsed ? "Expand navigation" : "Collapse navigation"}
         aria-expanded={!sidebarCollapsed}
-        className="m-2 flex items-center justify-center gap-1 rounded-full border border-border py-1.5 text-[11px] text-text-muted transition-colors hover:bg-panel-2 hover:text-text"
+        className="m-2 flex items-center justify-center gap-1 rounded-sm border border-border py-1.5 text-[11px] text-text-muted transition-colors hover:bg-panel-2 hover:text-text"
       >
         {sidebarCollapsed ? (
           <ChevronRight className="h-3.5 w-3.5" />
@@ -112,3 +106,4 @@ export function Sidebar() {
     </nav>
   );
 }
+

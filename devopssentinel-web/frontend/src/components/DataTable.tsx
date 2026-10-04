@@ -9,7 +9,7 @@ import {
   type VisibilityState,
 } from "@tanstack/react-table";
 import { useVirtualizer } from "@tanstack/react-virtual";
-import { ArrowDown, ArrowUp, Download, Search } from "lucide-react";
+import { ArrowDown, ArrowUp, ChevronsUpDown, Download, Search } from "lucide-react";
 import { useMemo, useRef, useState } from "react";
 
 import { Button } from "@/components/ui/button";
@@ -36,7 +36,7 @@ export interface DataTableProps<T> {
 export function DataTable<T>({
   data,
   columns,
-  rowHeight = 30,
+  rowHeight = 36,
   height = 560,
   globalFilter,
   onGlobalFilterChange,
@@ -136,7 +136,7 @@ export function DataTable<T>({
         role="region"
         aria-label="Data table"
       >
-        <table className="w-full border-collapse text-[12px]">
+        <table className="min-w-full border-collapse text-[12px]">
           <thead className="sticky top-0 z-10 bg-panel-2">
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
@@ -149,17 +149,21 @@ export function DataTable<T>({
                       aria-sort={
                         sorted === "asc" ? "ascending" : sorted === "desc" ? "descending" : "none"
                       }
-                      className="border-b border-border px-2 py-1.5 text-left text-[11px] font-semibold uppercase tracking-wide text-text-muted"
+                      className="border-b border-border px-3 py-2 text-left text-[12px] font-medium text-text-muted"
                     >
                       {header.column.getCanSort() ? (
                         <button
                           type="button"
-                          className="inline-flex items-center gap-1 hover:text-text"
+                          className="inline-flex items-center gap-1 transition-colors hover:text-text"
                           onClick={header.column.getToggleSortingHandler()}
+                          title={`Sort by ${header.column.id}`}
                         >
                           {flexRender(header.column.columnDef.header, header.getContext())}
-                          {sorted === "asc" ? <ArrowUp className="h-3 w-3" /> : null}
-                          {sorted === "desc" ? <ArrowDown className="h-3 w-3" /> : null}
+                          {sorted === "asc" ? <ArrowUp className="h-3 w-3" aria-hidden="true" /> : null}
+                          {sorted === "desc" ? <ArrowDown className="h-3 w-3" aria-hidden="true" /> : null}
+                          {sorted === false ? (
+                            <ChevronsUpDown className="h-3 w-3 opacity-45" aria-hidden="true" />
+                          ) : null}
                         </button>
                       ) : (
                         flexRender(header.column.columnDef.header, header.getContext())
@@ -194,13 +198,13 @@ export function DataTable<T>({
                         if (event.key === "Enter") onRowClick?.(row.original);
                       }}
                       className={cn(
-                        "border-b border-border/50 hover:bg-panel-2",
+                        "border-b border-border/60 hover:bg-panel-2",
                         onRowClick && "cursor-pointer",
                       )}
                       style={{ height: rowHeight }}
                     >
                       {row.getVisibleCells().map((cell) => (
-                        <td key={cell.id} className="truncate px-2 py-1 align-middle">
+                        <td key={cell.id} className="truncate px-3 py-1 align-middle">
                           {flexRender(cell.column.columnDef.cell, cell.getContext())}
                         </td>
                       ))}

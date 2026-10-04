@@ -29,6 +29,22 @@ DevOpsSentinel Web runs on an operator workstation, binds to `127.0.0.1`, and ex
 | Credential persistence | Only theme/panel/table preferences are stored; never tokens, passwords, Secrets or keys | `state/AppContext.tsx` |
 | LAN exposure | 127.0.0.1 default; `--listen` requires an explicit `--token` | `devopssentinel-web` |
 | Opt-in live data | Both live-data features are **off by default**; each needs its own flag (`--enable-sql-console` / `--enable-kafka-topics`) | `config.enable_sql_console`, `config.enable_kafka_topics` |
+| Unbounded kubectl surface | `kubectl` is pinned to six read-only verb pairs (`config get-contexts`, `config current-context`, `get namespaces`, `get ns`, `top pods`, `top nodes`); everything else is rejected before a process is spawned | `services/kube.py::_ALLOWED` |
+
+### Resource-usage helpers (`services/kube.py`)
+
+The engine reports *declared* requests and limits, not *observed* usage, so the adapter makes two
+extra read-only calls to render the live usage charts:
+
+* `kubectl top pods --no-headers` (optionally `--namespace`, validated as a DNS-1123 name) and
+  `kubectl top nodes --no-headers`. `top` is not a mutation verb, so it clears
+  `security.assert_read_only`, and the verb pair is pinned in `_ALLOWED` — `top secrets` or
+  `top pods delete …` are rejected.
+* Both calls use argv arrays (no shell), a 25 s timeout, and the same redaction path as every other
+  stream. Nothing is written to disk.
+* When the Metrics API is absent the endpoints return `source=UNAVAILABLE` with the kubectl message
+  as a warning; the UI renders "Metrics API unavailable" rather than an error page. Both paths are
+  covered by `backend/tests/test_kube.py`.
 
 ## 2a. Opt-in live-data exceptions (read this before enabling)
 

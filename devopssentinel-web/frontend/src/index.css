@@ -16,6 +16,14 @@
   --shadow-1: 0 1px 2px rgb(0 0 0 / 0.06), 0 1px 1px rgb(0 0 0 / 0.04);
   --shadow-2: 0 4px 14px rgb(0 0 0 / 0.10), 0 1px 3px rgb(0 0 0 / 0.06);
   --shadow-3: 0 18px 44px rgb(0 0 0 / 0.20), 0 4px 12px rgb(0 0 0 / 0.10);
+  /* Card shadow, so a theme can go flat (Material) without touching components. */
+  --shadow-card: var(--shadow-1);
+  /* Chrome = the breadcrumb / toolbar band. Defaults to a neutral panel so the
+   * original themes keep their existing top bar; the Kubernetes Dashboard theme
+   * paints it a saturated brand colour. */
+  --chrome: var(--panel);
+  --chrome-text: var(--text);
+  --chrome-hover: var(--panel-2);
 }
 
 /* ------------------------------------------------------------------ midnight */
@@ -214,6 +222,51 @@
   --c-info: #0369a1;
 }
 
+/* --------------------------------------------------------------- kubernetes */
+/* Mirrors the Kubernetes Dashboard: flat #f5f5f5 page, white bordered cards,
+ * Material square corners, an indigo toolbar band and the Kubernetes blue as
+ * the accent. The only theme that paints the chrome band a solid colour. */
+.theme-kubernetes {
+  color-scheme: light;
+  --radius-sm: 3px;
+  --radius: 4px;
+  --radius-lg: 6px;
+  --radius-xl: 8px;
+  --shadow-1: 0 1px 3px rgb(60 72 88 / 0.12), 0 1px 2px rgb(60 72 88 / 0.08);
+  --shadow-2: 0 2px 6px rgb(60 72 88 / 0.14), 0 1px 3px rgb(60 72 88 / 0.10);
+  --shadow-3: 0 12px 32px rgb(60 72 88 / 0.22), 0 3px 8px rgb(60 72 88 / 0.12);
+  --shadow-card: 0 1px 3px rgb(60 72 88 / 0.12), 0 1px 2px rgb(60 72 88 / 0.08);
+  --bg: #f5f5f5;
+  --bg-grad: none;
+  --panel: #ffffff;
+  --panel-2: #f1f3f6;
+  --bg-elevated: #ffffff;
+  --border: #d7dbe0;
+  --border-strong: #a9b2bf;
+  --text: #1f2933;
+  --text-muted: #5b6770;
+  --text-faint: #5f6b78;
+  --accent: #2a5cc4;
+  --accent-soft: #2a5cc41a;
+  --chrome: #3f51b5;
+  --chrome-text: #ffffff;
+  --chrome-hover: #35439a;
+  /* Domain + severity colours are used as *text* on their own 10% tint by the
+   * badge/status language, so they are chosen dark enough to clear 4.5:1 on a
+   * tint over either panel or panel-2. The vivid Kubernetes blue lives on in
+   * the chrome band, which carries white text. */
+  --c-kubernetes: #2a5cc4;
+  --c-gitops: #6d28d9;
+  --c-pki: #9f4a05;
+  --c-network: #1d4ed8;
+  --c-storage: #0d6a63;
+  --c-success: #0c6b2e;
+  --c-warning: #9c4d07;
+  --c-critical: #b02525;
+  --c-unknown: #556070;
+  --c-info: #0369a1;
+}
+
 @theme inline {
   --color-bg: var(--bg);
   --color-bg-elevated: var(--bg-elevated);
@@ -226,6 +279,9 @@
   --color-text-faint: var(--text-faint);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
+  --color-chrome: var(--chrome);
+  --color-chrome-text: var(--chrome-text);
+  --color-chrome-hover: var(--chrome-hover);
   --color-kubernetes: var(--c-kubernetes);
   --color-gitops: var(--c-gitops);
   --color-pki: var(--c-pki);
@@ -278,6 +334,22 @@ body {
   border: 1px solid var(--border);
   border-radius: var(--radius-lg);
   box-shadow: var(--shadow-1);
+}
+
+/* Card chrome: white surface, hairline border, theme-controlled radius and a
+ * flat Material shadow in the kubernetes theme. */
+.surface-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-card);
+}
+
+/* The breadcrumb / toolbar band. Neutral in every theme except kubernetes. */
+.chrome-band {
+  background: var(--chrome);
+  color: var(--chrome-text);
+  border-bottom: 1px solid var(--border);
 }
 
 .surface-raised {

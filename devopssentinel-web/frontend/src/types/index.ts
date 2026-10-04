@@ -180,6 +180,23 @@ export interface TopicListingPayload {
   truncated: boolean;
 }
 
+/** Observed resource usage from the read-only Metrics API. */
+export interface PodUsage {
+  name: string;
+  cpuMillicores: number;
+  cpuCores: number;
+  memoryBytes: number;
+}
+
+export interface NodeUsage {
+  name: string;
+  cpuMillicores: number;
+  cpuCores: number;
+  cpuPercent: number | null;
+  memoryBytes: number;
+  memoryPercent: number | null;
+}
+
 export interface GraphNode {
   id: string;
   kind: string;

@@ -1,9 +1,17 @@
 """Minimal, explicitly allowlisted read-only kubectl discovery.
 
 The engine does not expose "list contexts" / "list namespaces" as a report,
-so the adapter performs two narrowly-scoped, read-only discovery calls.
-Both are argv-array, no-shell, timeout-bounded, and listed in the parity
-matrix as ``backend read-only helper``. No other kubectl verb is permitted.
+nor observed resource usage, so the adapter performs a few narrowly-scoped,
+read-only calls:
+
+* ``config get-contexts`` / ``config current-context`` -- scope pickers
+* ``get namespaces`` -- scope picker
+* ``top pods`` / ``top nodes`` -- live CPU/memory usage for the usage charts
+
+Every call is argv-array, no-shell, timeout-bounded, and listed in the parity
+matrix as ``backend read-only helper``. No other kubectl verb is permitted:
+``_ALLOWED`` pins the exact verb pairs and :func:`app.security.assert_read_only`
+rejects mutation verbs before the process is spawned.
 """
 
 from __future__ import annotations
@@ -14,13 +22,15 @@ import shutil
 from pathlib import Path
 
 from ..config import settings
-from ..security import assert_read_only, validate_context
+from ..security import assert_read_only, validate_context, validate_name
 
 _ALLOWED = {
     ("config", "get-contexts"),
     ("config", "current-context"),
     ("get", "namespaces"),
     ("get", "ns"),
+    ("top", "pods"),
+    ("top", "nodes"),
 }
 
 # Global flags that take a value and may precede the verb.
@@ -107,3 +117,130 @@ def capabilities() -> dict[str, bool]:
         "kafka": shutil.which("kafka-topics.sh") is not None
         or shutil.which("kafka-topics") is not None,
     }
+
+
+# --------------------------------------------------------------------------
+# Live resource usage (read-only `kubectl top`)
+#
+# The engine reports declared requests/limits, not observed usage, so the
+# adapter performs one more narrowly-scoped read-only call. `top` is not a
+# mutation verb and is pinned in _ALLOWED above.
+# --------------------------------------------------------------------------
+
+_MEMORY_SUFFIX = {
+    "Ki": 1024,
+    "Mi": 1024**2,
+    "Gi": 1024**3,
+    "Ti": 1024**4,
+    "K": 1000,
+    "M": 1000**2,
+    "G": 1000**3,
+    "T": 1000**4,
+}
+
+
+def parse_cpu(value: str) -> float:
+    """``250m`` -> 0.25 cores, ``1500000n`` -> 0.0015 cores, ``2`` -> 2.0."""
+    text = (value or "").strip()
+    if not text or text == "<unknown>":
+        return 0.0
+    try:
+        if text.endswith("n"):
+            return float(text[:-1]) / 1_000_000_000
+        if text.endswith("u"):
+            return float(text[:-1]) / 1_000_000
+        if text.endswith("m"):
+            return float(text[:-1]) / 1000
+        return float(text)
+    except ValueError:
+        return 0.0
+
+
+def parse_memory(value: str) -> int:
+    """``364Mi`` -> bytes, ``1500K`` -> bytes, ``12345`` -> bytes."""
+    text = (value or "").strip()
+    if not text or text == "<unknown>":
+        return 0
+    for suffix, factor in _MEMORY_SUFFIX.items():
+        if text.endswith(suffix):
+            try:
+                return int(float(text[: -len(suffix)]) * factor)
+            except ValueError:
+                return 0
+    try:
+        return int(float(text))
+    except ValueError:
+        return 0
+
+
+def _percent(value: str) -> float | None:
+    text = (value or "").strip().rstrip("%")
+    try:
+        return float(text)
+    except ValueError:
+        return None
+
+
+def parse_top_pods(output: str) -> list[dict]:
+    """Parse `kubectl top pods --no-headers` (NAME CPU(cores) MEMORY(bytes))."""
+    rows: list[dict] = []
+    for line in output.splitlines():
+        parts = line.split()
+        if len(parts) < 3:
+            continue
+        name, cpu, memory = parts[0], parts[-2], parts[-1]
+        cores = parse_cpu(cpu)
+        rows.append(
+            {
+                "name": name,
+                "cpuMillicores": int(round(cores * 1000)),
+                "cpuCores": round(cores, 4),
+                "memoryBytes": parse_memory(memory),
+            }
+        )
+    return rows
+
+
+def parse_top_nodes(output: str) -> list[dict]:
+    """Parse `kubectl top nodes --no-headers` (NAME CPU CPU% MEMORY MEMORY%)."""
+    rows: list[dict] = []
+    for line in output.splitlines():
+        parts = line.split()
+        if len(parts) < 5:
+            continue
+        cores = parse_cpu(parts[1])
+        rows.append(
+            {
+                "name": parts[0],
+                "cpuMillicores": int(round(cores * 1000)),
+                "cpuCores": round(cores, 4),
+                "cpuPercent": _percent(parts[2]),
+                "memoryBytes": parse_memory(parts[3]),
+                "memoryPercent": _percent(parts[4]),
+            }
+        )
+    return rows
+
+
+async def top_pods(context: str = "", namespace: str = "") -> list[dict]:
+    args: list[str] = []
+    if context:
+        args += ["--context", validate_context(context)]
+    if namespace:
+        args += ["--namespace", validate_name(namespace, field="namespace")]
+    args += ["top", "pods", "--no-headers"]
+    rc, out, err = await _run(args, timeout=25.0)
+    if rc != 0:
+        raise KubeError(err.strip() or "kubectl top pods failed")
+    return parse_top_pods(out)
+
+
+async def top_nodes(context: str = "") -> list[dict]:
+    args: list[str] = []
+    if context:
+        args += ["--context", validate_context(context)]
+    args += ["top", "nodes", "--no-headers"]
+    rc, out, err = await _run(args, timeout=25.0)
+    if rc != 0:
+        raise KubeError(err.strip() or "kubectl top nodes failed")
+    return parse_top_nodes(out)

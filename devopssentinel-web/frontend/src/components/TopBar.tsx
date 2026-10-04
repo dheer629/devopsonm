@@ -46,12 +46,12 @@ export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
   }, [namespace, namespaceList, setNamespace]);
 
   return (
-    <header className="flex flex-wrap items-center gap-2 border-b border-border/80 bg-panel/85 px-3 py-2 backdrop-blur-xl">
+    <header className="flex flex-wrap items-center gap-2 border-b border-border bg-panel px-3 py-2.5">
       <div className="flex items-center gap-2">
         <span className="flex h-7 w-7 items-center justify-center rounded-full bg-accent-soft">
           <ShieldCheck className="h-4 w-4 text-accent" aria-hidden="true" />
         </span>
-        <span className="text-[13px] font-semibold tracking-tight">DevOpsSentinel</span>
+        <span className="text-[13.5px] font-semibold tracking-tight">DevOpsSentinel</span>
         <Badge tone="neutral" className="mono">
           v{system.data?.data.webVersion ?? "1.0.0"}
         </Badge>
@@ -64,12 +64,12 @@ export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
       <button
         type="button"
         onClick={onOpenPalette}
-        className="ml-2 flex h-8 min-w-[240px] flex-1 items-center gap-2 rounded-full border border-border bg-bg-elevated px-3 text-left text-[12px] text-text-faint transition-colors hover:border-border-strong hover:text-text-muted md:max-w-md"
+        className="ml-2 flex h-9 min-w-[240px] flex-1 items-center gap-2 rounded-sm border border-border bg-bg-elevated px-3 text-left text-[12.5px] text-text-faint transition-colors hover:border-border-strong hover:text-text-muted md:max-w-xl"
         aria-label="Open global search and command palette"
       >
-        <Search className="h-3.5 w-3.5" aria-hidden="true" />
+        <Search className="h-4 w-4" aria-hidden="true" />
         <span className="flex-1">Search resources and commands…</span>
-        <kbd className="mono rounded-full border border-border px-1.5 text-[10px]">Ctrl K</kbd>
+        <kbd className="mono rounded-sm border border-border px-1.5 text-[10px]">Ctrl K</kbd>
       </button>
 
       <div className="ml-auto flex flex-wrap items-center gap-2">
@@ -81,22 +81,6 @@ export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
             </SelectTrigger>
             <SelectContent>
               {contextList.map((item) => (
-                <SelectItem key={item} value={item}>
-                  {item}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </label>
-
-        <label className="flex items-center gap-1 text-[11px] text-text-muted">
-          <span className="sr-only">Namespace</span>
-          <Select value={namespace || undefined} onValueChange={setNamespace}>
-            <SelectTrigger className="h-7 w-[190px]" aria-label="Namespace">
-              <SelectValue placeholder={namespace || "Select namespace"} />
-            </SelectTrigger>
-            <SelectContent>
-              {namespaceList.map((item) => (
                 <SelectItem key={item} value={item}>
                   {item}
                 </SelectItem>

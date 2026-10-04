@@ -47,3 +47,37 @@ export function reportText(data: unknown): string {
   }
   return "";
 }
+
+/** Kubernetes-style decimal suffixes, so the columns read like `kubectl top`. */
+function suffixDigits(value: number): number {
+  return value >= 100 ? 0 : 3;
+}
+
+/** Millicores -> cores, e.g. `140` -> "0.140", `0` -> "0". */
+export function formatCores(millicores: number): string {
+  const cores = (millicores || 0) / 1000;
+  if (!Number.isFinite(cores) || cores <= 0) return "0";
+  if (cores >= 1) return cores.toFixed(2);
+  if (cores >= 0.001) return cores.toFixed(3);
+  const tiny = cores.toFixed(4);
+  return tiny === "0.0000" ? "<0.0001" : tiny;
+}
+
+/** Bytes -> `19.746 Mi`, `644 Mi`, `1.234 Gi`. */
+export function formatBytes(bytes: number): string {
+  const value = bytes || 0;
+  if (value <= 0) return "0";
+  const units: [number, string][] = [
+    [1024 ** 4, "Ti"],
+    [1024 ** 3, "Gi"],
+    [1024 ** 2, "Mi"],
+    [1024, "Ki"],
+  ];
+  for (const [limit, suffix] of units) {
+    if (value >= limit) {
+      const scaled = value / limit;
+      return `${scaled.toFixed(suffixDigits(scaled))} ${suffix}`;
+    }
+  }
+  return `${value} B`;
+}

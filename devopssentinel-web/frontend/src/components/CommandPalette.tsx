@@ -5,7 +5,7 @@ import { useNavigate } from "react-router-dom";
 import { useCertificates, useGitOps, usePods } from "@/api/queries";
 import { Dialog, DialogContent } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
-import { NAV_ITEMS } from "@/components/Sidebar";
+import { NAV_ITEMS } from "@/lib/nav";
 import { useApp } from "@/state/AppContext";
 import type { SearchResult } from "@/types";
 

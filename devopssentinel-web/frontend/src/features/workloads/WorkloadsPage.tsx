@@ -2,21 +2,54 @@ import type { ColumnDef } from "@tanstack/react-table";
 import { useMemo } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
-import { usePods, useWorkloads } from "@/api/queries";
+import { usePods, useNodeMetrics, usePodMetrics, useWorkloads } from "@/api/queries";
 import { DataTable } from "@/components/DataTable";
 import { ErrorState, Freshness, LoadingRows, PageHeader, PartialBanner, StatusPill } from "@/components/common";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardBody } from "@/components/ui/card";
+import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { UsageBar, UsageChart, useUsageHistory } from "@/components/Usage";
+import { formatBytes, formatCores } from "@/lib/format";
 import { severityRank } from "@/lib/status";
 import { useApp } from "@/state/AppContext";
-import type { Pod, Workload } from "@/types";
+import type { Pod, PodUsage, Workload } from "@/types";
 
 export function WorkloadsPage() {
   const { scope, setSelection } = useApp();
   const navigate = useNavigate();
   const workloads = useWorkloads(scope);
   const pods = usePods(scope);
+  const nodeMetrics = useNodeMetrics(scope.context ?? "", Boolean(scope.context));
+  const podMetrics = usePodMetrics(scope, Boolean(scope.namespace));
+
+  const usageByName = useMemo(() => {
+    const map = new Map<string, PodUsage>();
+    for (const row of podMetrics.data?.data?.pods ?? []) map.set(row.name, row);
+    return map;
+  }, [podMetrics.data]);
+
+  const podCpuMax = useMemo(
+    () => Math.max(1, ...Array.from(usageByName.values(), (row) => row.cpuMillicores)),
+    [usageByName],
+  );
+  const podMemoryMax = useMemo(
+    () => Math.max(1, ...Array.from(usageByName.values(), (row) => row.memoryBytes)),
+    [usageByName],
+  );
+
+  const nodes = nodeMetrics.data?.data?.nodes ?? [];
+  const nodeStamp = nodeMetrics.data?.timestamp;
+  const nodeCores = useMemo(
+    () => nodes.reduce((total, node) => total + node.cpuMillicores, 0),
+    [nodes],
+  );
+  const nodeMemory = useMemo(
+    () => nodes.reduce((total, node) => total + node.memoryBytes, 0),
+    [nodes],
+  );
+  const cpuHistory = useUsageHistory(nodeStamp, nodeCores);
+  const memoryHistory = useUsageHistory(nodeStamp, nodeMemory);
+  const metricsUnavailable = (nodeMetrics.data?.errors.length ?? 0) > 0;
 
   const workloadRows = useMemo(
     () =>
@@ -55,8 +88,42 @@ export function WorkloadsPage() {
       },
       { accessorKey: "node", header: "Node" },
       { accessorKey: "age", header: "Age" },
+      {
+        id: "cpu",
+        header: "CPU (cores)",
+        accessorFn: (row) => usageByName.get(row.name)?.cpuMillicores ?? 0,
+        cell: (info) => {
+          const usage = usageByName.get((info.row.original as Pod).name);
+          if (!usage) return <span className="text-text-faint">—</span>;
+          return (
+            <UsageBar
+              value={usage.cpuMillicores}
+              max={podCpuMax}
+              label={formatCores(usage.cpuMillicores)}
+              color="var(--c-success)"
+            />
+          );
+        },
+      },
+      {
+        id: "memory",
+        header: "Memory (bytes)",
+        accessorFn: (row) => usageByName.get(row.name)?.memoryBytes ?? 0,
+        cell: (info) => {
+          const usage = usageByName.get((info.row.original as Pod).name);
+          if (!usage) return <span className="text-text-faint">—</span>;
+          return (
+            <UsageBar
+              value={usage.memoryBytes}
+              max={podMemoryMax}
+              label={formatBytes(usage.memoryBytes)}
+              color="var(--c-kubernetes)"
+            />
+          );
+        },
+      },
     ],
-    [],
+    [usageByName, podCpuMax, podMemoryMax],
   );
 
   const workloadColumns = useMemo<ColumnDef<Workload, unknown>[]>(
@@ -102,6 +169,49 @@ export function WorkloadsPage() {
       />
 
       {workloads.data ? <PartialBanner envelope={workloads.data.envelope} /> : null}
+
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+        <Card>
+          <CardHeader>
+            <CardTitle>CPU usage</CardTitle>
+            <span className="mono text-[11px] text-text-muted">
+              {metricsUnavailable ? "metrics unavailable" : `${nodes.length} nodes`}
+            </span>
+          </CardHeader>
+          <CardBody className="pt-1">
+            <UsageChart
+              points={cpuHistory}
+              kind="cpu"
+              color="var(--c-success)"
+              emptyMessage={
+                metricsUnavailable
+                  ? "Metrics API unavailable — install metrics-server to chart live usage."
+                  : undefined
+              }
+            />
+          </CardBody>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Memory usage</CardTitle>
+            <span className="mono text-[11px] text-text-muted">
+              {metricsUnavailable ? "metrics unavailable" : `${nodes.length} nodes`}
+            </span>
+          </CardHeader>
+          <CardBody className="pt-1">
+            <UsageChart
+              points={memoryHistory}
+              kind="memory"
+              color="var(--c-kubernetes)"
+              emptyMessage={
+                metricsUnavailable
+                  ? "Metrics API unavailable — install metrics-server to chart live usage."
+                  : undefined
+              }
+            />
+          </CardBody>
+        </Card>
+      </div>
 
       <Tabs defaultValue="pods">
         <TabsList>

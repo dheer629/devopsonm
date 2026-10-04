@@ -256,6 +256,32 @@ export const KAFKA_SERVICES = [
   },
 ];
 
+export const NODE_USAGE = [
+  {
+    name: "minikube",
+    cpuMillicores: 140,
+    cpuCores: 0.14,
+    cpuPercent: 0,
+    memoryBytes: 1850 * 1024 * 1024,
+    memoryPercent: 24,
+  },
+];
+
+export const POD_USAGE = [
+  {
+    name: "log-transformer-def",
+    cpuMillicores: 15,
+    cpuCores: 0.015,
+    memoryBytes: 58 * 1024 * 1024,
+  },
+  {
+    name: "transformer-abc",
+    cpuMillicores: 1,
+    cpuCores: 0.001,
+    memoryBytes: 19 * 1024 * 1024,
+  },
+];
+
 export const GRAPH = {
   nodes: [
     { id: "Pod/transformer-abc", kind: "Pod", name: "transformer-abc", namespace: "devopsonm", domain: "kubernetes", state: "OK", confidence: "CONFIRMED" },
@@ -302,6 +328,13 @@ export async function installFixtures(page: Page): Promise<void> {
     }
     if (path.endsWith("/namespaces")) {
       return json(envelope({ namespaces: ["devopsonm", "flux-system"] }, { source: "LOCAL" }));
+    }
+    // Usage routes must be matched before the generic "/pods" rule below.
+    if (path.endsWith("/metrics/nodes")) {
+      return json(envelope({ nodes: NODE_USAGE }, { source: "LIVE" }));
+    }
+    if (path.endsWith("/metrics/pods")) {
+      return json(envelope({ pods: POD_USAGE }, { source: "LIVE" }));
     }
     if (path.endsWith("/pods")) return json({ envelope: envelope(PODS), raw: rawEvidence() });
     if (path.endsWith("/workloads")) return json({ envelope: envelope(WORKLOADS), raw: rawEvidence() });

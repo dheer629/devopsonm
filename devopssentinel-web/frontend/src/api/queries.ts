@@ -19,6 +19,8 @@ import type {
   OperationResponse,
   Pin,
   Pod,
+  PodUsage,
+  NodeUsage,
   PVCResource,
   QueryResultPayload,
   ServiceResource,
@@ -303,6 +305,25 @@ export function useRunQuery() {
 export function useListTopics() {
   return useMutation<Envelope<TopicListingPayload>, Error, { host: string; port: number }>({
     mutationFn: (payload) => postJson<TopicListingPayload>("/api/v1/kafka/topics", payload),
+  });
+}
+
+/** Observed resource usage (read-only `kubectl top`, refreshed on the live tick). */
+export function useNodeMetrics(context: string, enabled = true) {
+  return useQuery<Envelope<{ nodes: NodeUsage[] }>>({
+    queryKey: ["metrics-nodes", context],
+    queryFn: () => getEnvelope<{ nodes: NodeUsage[] }>("/api/v1/metrics/nodes", { context }),
+    enabled,
+    staleTime: 5_000,
+  });
+}
+
+export function usePodMetrics(scope: Scope, enabled = true) {
+  return useQuery<Envelope<{ pods: PodUsage[] }>>({
+    queryKey: ["metrics-pods", scope.context ?? "", scope.namespace ?? ""],
+    queryFn: () => getEnvelope<{ pods: PodUsage[] }>("/api/v1/metrics/pods", scope),
+    enabled,
+    staleTime: 5_000,
   });
 }
 

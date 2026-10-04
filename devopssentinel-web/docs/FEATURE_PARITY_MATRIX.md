@@ -87,6 +87,7 @@ Legend
 | Addition | Rationale |
 | --- | --- |
 | `GET /api/v1/contexts`, `/namespaces` | Two narrowly-scoped read-only kubectl discovery calls; the engine exposes no list mode |
+| `GET /api/v1/metrics/nodes`, `/metrics/pods` | Two read-only `kubectl top` calls. The engine reports declared requests/limits, never observed usage, so the usage charts and the CPU/Memory table columns have no engine source. Degrades to `UNAVAILABLE` without metrics-server; see docs/SECURITY.md §2 |
 | `GET /api/v1/database/services`, `/kafka/services` | Structured views of the engine's own discovery tables (metadata only) so the pages can render tables instead of raw text |
 | `GET /api/v1/database/console`, `POST /api/v1/database/query` | **Opt-in** (`DSWEB_ENABLE_SQL_CONSOLE=1`). Read-only SQL console; see docs/SECURITY.md §2a for the full contract |
 | `GET /api/v1/kafka/console`, `POST /api/v1/kafka/topics` | **Opt-in** (`DSWEB_ENABLE_KAFKA_TOPICS=1`). One read-only Kafka Metadata v1 request; see docs/SECURITY.md §2a |

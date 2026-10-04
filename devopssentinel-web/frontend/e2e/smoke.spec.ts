@@ -22,6 +22,25 @@ test("workload grid lists pods and opens pod detail", async ({ page }) => {
   await expect(page.getByText("PARTIAL —").first()).toBeVisible();
 });
 
+test("workload grid charts live CPU and memory usage", async ({ page }) => {
+  await page.goto("/workloads");
+  await expect(page.getByRole("heading", { name: "CPU usage" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Memory usage" })).toBeVisible();
+  // The columns carry the observed usage from the Metrics API.
+  await expect(page.getByRole("columnheader", { name: "CPU (cores)" })).toBeVisible();
+  await expect(page.getByRole("columnheader", { name: "Memory (bytes)" })).toBeVisible();
+  await expect(page.getByText("0.015").first()).toBeVisible();
+  await expect(page.getByText("58.000 Mi").first()).toBeVisible();
+});
+
+test("breadcrumb band shows the section and current page", async ({ page }) => {
+  await page.goto("/workloads");
+  const crumbs = page.getByRole("navigation", { name: "Breadcrumb" });
+  await expect(crumbs).toContainText("Workloads");
+  await expect(crumbs).toContainText("Pods");
+  await expect(crumbs.getByRole("listitem")).toHaveCount(2);
+});
+
 test("findings center sorts critical first", async ({ page }) => {
   await page.goto("/findings");
   await expect(page.getByRole("heading", { name: "Findings Center" })).toBeVisible();
