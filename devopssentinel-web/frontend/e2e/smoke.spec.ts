@@ -64,6 +64,38 @@ test("LIVE interval keeps the page refreshing without interaction", async ({ pag
   await expect.poll(() => reads, { timeout: 15_000 }).toBeGreaterThan(before);
 });
 
+test("usage charts observe the cluster on their own and can be paused", async ({ page }) => {
+  test.setTimeout(60_000);
+  let reads = 0;
+  page.on("request", (request) => {
+    if (new URL(request.url()).pathname === "/api/v1/metrics/nodes") reads += 1;
+  });
+
+  await page.goto("/workloads");
+  await expect(page.getByRole("heading", { name: "CPU usage" })).toBeVisible();
+
+  // Observation is the chart's own behaviour -- no LIVE switch, no interaction.
+  // The Metrics API answers with an instantaneous value, so repeated reads are
+  // the only way a trend can exist, and the card has to say it is doing that.
+  await expect(page.getByText("observing every 5s").first()).toBeVisible();
+  const before = reads;
+  await expect.poll(() => reads, { timeout: 20_000 }).toBeGreaterThan(before);
+  // The samples the chart reports are the ones it collected, not just traffic.
+  await expect(page.getByText(/15 min window · [2-9]\d* samples/).first()).toBeVisible();
+
+  await page.getByRole("button", { name: "Pause chart observation" }).first().click();
+  await expect(page.getByText("observation paused").first()).toBeVisible();
+  const paused = reads;
+  await page.waitForTimeout(7_000);
+  expect(reads).toBe(paused);
+  // Pausing stops the sampling; it never discards what was already observed.
+  await expect(page.getByText(/15 min window · [2-9]\d* samples/).first()).toBeVisible();
+
+  await page.getByRole("button", { name: "Resume chart observation" }).first().click();
+  await expect(page.getByText("observing every 5s").first()).toBeVisible();
+  await expect.poll(() => reads, { timeout: 20_000 }).toBeGreaterThan(paused);
+});
+
 test("breadcrumb band shows the section and current page", async ({ page }) => {
   await page.goto("/workloads");
   const crumbs = page.getByRole("navigation", { name: "Breadcrumb" });

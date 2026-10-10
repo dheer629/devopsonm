@@ -36,6 +36,13 @@ interface AppState {
   live: LiveInterval;
   setLive: (v: LiveInterval) => void;
   liveActive: boolean;
+  /**
+   * Chart observation: sample the Metrics API every few seconds while a page
+   * that draws usage charts is open. Independent of the LIVE switch, because a
+   * trend cannot exist without sampling, and the charts say so on the card.
+   */
+  observe: boolean;
+  setObserve: (v: boolean) => void;
   sidebarCollapsed: boolean;
   toggleSidebar: () => void;
   inspectorOpen: boolean;
@@ -56,6 +63,7 @@ const LS = {
   context: "dsweb.context",
   namespace: "dsweb.namespace",
   live: "dsweb.live",
+  observe: "dsweb.observe",
   sidebar: "dsweb.sidebar",
   inspectorWidth: "dsweb.inspectorWidth",
 };
@@ -97,6 +105,9 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const [live, setLiveState] = useState<LiveInterval>(
     () => Number(readLocal(LS.live, "0")) as LiveInterval,
   );
+  // Observation is on unless the operator turned it off: the usage charts are
+  // meaningless without it, and it costs two metrics reads per interval.
+  const [observe, setObserveState] = useState(() => readLocal(LS.observe, "1") === "1");
   const [sidebarCollapsed, setSidebarCollapsed] = useState(
     () => readLocal(LS.sidebar, "0") === "1",
   );
@@ -150,6 +161,11 @@ export function AppProvider({ children }: { children: ReactNode }) {
     writeLocal(LS.live, String(value));
   }, []);
 
+  const setObserve = useCallback((value: boolean) => {
+    setObserveState(value);
+    writeLocal(LS.observe, value ? "1" : "0");
+  }, []);
+
   const toggleSidebar = useCallback(() => {
     setSidebarCollapsed((prev) => {
       writeLocal(LS.sidebar, prev ? "0" : "1");
@@ -186,6 +202,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       live,
       setLive,
       liveActive: live > 0 && pageVisible,
+      observe,
+      setObserve,
       sidebarCollapsed,
       toggleSidebar,
       inspectorOpen,
@@ -209,6 +227,8 @@ export function AppProvider({ children }: { children: ReactNode }) {
       scope,
       live,
       setLive,
+      observe,
+      setObserve,
       pageVisible,
       sidebarCollapsed,
       toggleSidebar,

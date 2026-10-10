@@ -1,7 +1,8 @@
-import { render, renderHook, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { fireEvent, render, renderHook, screen } from "@testing-library/react";
+import { describe, expect, it, vi } from "vitest";
 
 import {
+  ObservationControl,
   rangeSummary,
   UsageChart,
   useUsageHistory,
@@ -125,5 +126,27 @@ describe("windowedSeries", () => {
       { t: now - 60_000, value: 4 },
       { t: now, value: 5 },
     ]);
+  });
+});
+
+describe("ObservationControl", () => {
+  it("says the chart is observing, and pauses it on click", () => {
+    const onToggle = vi.fn();
+    render(<ObservationControl observing onToggle={onToggle} />);
+
+    // A single dot under a "15 min window" caption needs to say why it is
+    // alone: the card is sampling, so a second sample is on its way.
+    expect(screen.getByText("observing every 5s")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Pause chart observation" }));
+    expect(onToggle).toHaveBeenCalledTimes(1);
+  });
+
+  it("says observation is paused, and resumes it on click", () => {
+    const onToggle = vi.fn();
+    render(<ObservationControl observing={false} onToggle={onToggle} />);
+
+    expect(screen.getByText("observation paused")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Resume chart observation" }));
+    expect(onToggle).toHaveBeenCalledTimes(1);
   });
 });

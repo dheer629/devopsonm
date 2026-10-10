@@ -424,11 +424,19 @@ export async function installFixtures(page: Page): Promise<void> {
       return json(envelope({ namespaces: ["devopsonm", "flux-system"] }, { source: "LOCAL" }));
     }
     // Usage routes must be matched before the generic "/pods" rule below.
+    // Metrics are the one read whose *history* the UI builds from repeated
+    // samples, so these two routes stamp each response the way the real
+    // endpoint does. A frozen timestamp would make the charts look incapable of
+    // accumulating, which is exactly the behaviour under test.
     if (path.endsWith("/metrics/nodes")) {
-      return json(envelope({ nodes: NODE_USAGE }, { source: "LIVE" }));
+      return json(
+        envelope({ nodes: NODE_USAGE }, { source: "LIVE", timestamp: new Date().toISOString() }),
+      );
     }
     if (path.endsWith("/metrics/pods")) {
-      return json(envelope({ pods: POD_USAGE }, { source: "LIVE" }));
+      return json(
+        envelope({ pods: POD_USAGE }, { source: "LIVE", timestamp: new Date().toISOString() }),
+      );
     }
     if (path.endsWith("/pods")) return json({ envelope: envelope(PODS), raw: rawEvidence() });
     if (path.endsWith("/workloads")) return json({ envelope: envelope(WORKLOADS), raw: rawEvidence() });

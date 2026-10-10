@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 
+import { Button } from "@/components/ui/button";
 import { formatBytes, formatCores } from "@/lib/format";
+import { OBSERVE_INTERVAL_MS, observationNote } from "@/lib/observation";
+import { cn } from "@/lib/utils";
 
 export interface UsageSample {
   t: number;
@@ -114,6 +117,44 @@ export function RangeSelect({
         ))}
       </select>
     </label>
+  );
+}
+
+/**
+ * The observation state of a chart, with the control that stops it.
+ *
+ * The Metrics API answers with an instantaneous value, so the history a chart
+ * draws is exactly what has been sampled since the page opened. A single dot
+ * under a "15 min window" caption therefore needs to say *why*: this card is
+ * observing, at this interval, and the operator can pause it (spec section 54).
+ */
+export function ObservationControl({
+  observing,
+  onToggle,
+  intervalMs = OBSERVE_INTERVAL_MS,
+}: {
+  observing: boolean;
+  onToggle: () => void;
+  intervalMs?: number;
+}) {
+  return (
+    <span className="flex items-center gap-1.5">
+      <span className="flex items-center gap-1 text-[11px] text-text-muted">
+        <span
+          aria-hidden="true"
+          className={cn("h-1.5 w-1.5 rounded-full", observing ? "bg-success" : "bg-text-faint")}
+        />
+        {observationNote(observing, intervalMs)}
+      </span>
+      <Button
+        variant="outline"
+        size="sm"
+        onClick={onToggle}
+        aria-label={observing ? "Pause chart observation" : "Resume chart observation"}
+      >
+        {observing ? "Pause" : "Observe"}
+      </Button>
+    </span>
   );
 }
 

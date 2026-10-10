@@ -656,21 +656,29 @@ export function useListTopics() {
 }
 
 /** Observed resource usage (read-only `kubectl top`, refreshed on the live tick). */
-export function useNodeMetrics(context: string, enabled = true) {
+/**
+ * Node usage. `refetchIntervalMs` is how the usage charts observe: a metrics
+ * read is instantaneous, so only repeated reads produce a trend. Leaving it
+ * undefined keeps the query on the LIVE switch alone.
+ */
+export function useNodeMetrics(context: string, enabled = true, refetchIntervalMs?: number) {
   return useQuery<Envelope<{ nodes: NodeUsage[] }>>({
     queryKey: ["metrics-nodes", context],
     queryFn: () => getEnvelope<{ nodes: NodeUsage[] }>("/api/v1/metrics/nodes", { context }),
     enabled,
     staleTime: 5_000,
+    refetchInterval: refetchIntervalMs,
   });
 }
 
-export function usePodMetrics(scope: Scope, enabled = true) {
+/** Pod usage, observed the same way as {@link useNodeMetrics}. */
+export function usePodMetrics(scope: Scope, enabled = true, refetchIntervalMs?: number) {
   return useQuery<Envelope<{ pods: PodUsage[] }>>({
     queryKey: ["metrics-pods", scope.context ?? "", scope.namespace ?? ""],
     queryFn: () => getEnvelope<{ pods: PodUsage[] }>("/api/v1/metrics/pods", scope),
     enabled,
     staleTime: 5_000,
+    refetchInterval: refetchIntervalMs,
   });
 }
 

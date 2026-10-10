@@ -334,8 +334,9 @@ backend route without a UI is a test failure rather than a silent gap.
 | 8 professional themes (4 dark / 4 light, incl. a Kubernetes-Dashboard palette) + system auto, swatch picker | ✅ |
 | Virtualized tables (5,000-row inventory test), status = icon + text + colour | ✅ |
 | LIVE interval that actually re-reads every cluster-facing query, plus an explicit **Refresh now** | ✅ |
+| Usage charts observe the Metrics API every 5 s while their page is open (labelled on the card, pausable), so a trend exists without turning LIVE on | ✅ |
 | SSE endpoints for live refresh and streamed logs | ✅ |
-| pytest (263), Vitest (64), Playwright smoke + axe (frontend-only, fixture-backed) | ✅ |
+| pytest (263), Vitest (69), Playwright smoke + axe (frontend-only, fixture-backed) | ✅ |
 | Live TLS inspection, an unbounded log follower, DB/Kafka credential prompts | ⛔ CLI only (see parity matrix) |
 
 See **[docs/FEATURE_PARITY_MATRIX.md](docs/FEATURE_PARITY_MATRIX.md)** for the complete

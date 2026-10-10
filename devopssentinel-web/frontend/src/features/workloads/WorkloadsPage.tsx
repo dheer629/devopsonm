@@ -10,6 +10,7 @@ import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
   DEFAULT_USAGE_RANGE,
+  ObservationControl,
   RangeSelect,
   rangeSummary,
   UsageBar,
@@ -20,17 +21,24 @@ import {
   type UsageRangeId,
 } from "@/components/Usage";
 import { formatBytes, formatCores } from "@/lib/format";
+import { OBSERVE_INTERVAL_MS } from "@/lib/observation";
 import { severityRank } from "@/lib/status";
 import { useApp } from "@/state/AppContext";
 import type { Pod, PodUsage, Workload } from "@/types";
 
 export function WorkloadsPage() {
-  const { scope, setSelection } = useApp();
+  const { scope, setSelection, observe, setObserve } = useApp();
   const navigate = useNavigate();
   const workloads = useWorkloads(scope);
   const pods = usePods(scope);
-  const nodeMetrics = useNodeMetrics(scope.context ?? "", Boolean(scope.context));
-  const podMetrics = usePodMetrics(scope, Boolean(scope.namespace));
+  // The charts observe the cluster themselves: the Metrics API is instantaneous,
+  // so a trend only exists if this page keeps sampling. Pausing it stops both
+  // metrics reads and leaves the collected history in place. (If the LIVE switch
+  // is also on it re-reads the same two queries; each read is just another
+  // sample, so the two controls never disagree about what was measured.)
+  const observeMs = observe ? OBSERVE_INTERVAL_MS : undefined;
+  const nodeMetrics = useNodeMetrics(scope.context ?? "", Boolean(scope.context), observeMs);
+  const podMetrics = usePodMetrics(scope, Boolean(scope.namespace), observeMs);
 
   const usageByName = useMemo(() => {
     const map = new Map<string, PodUsage>();
@@ -199,8 +207,11 @@ export function WorkloadsPage() {
         <Card>
           <CardHeader>
             <CardTitle>CPU usage</CardTitle>
-            <span className="mono text-[11px] text-text-muted">
-              {metricsUnavailable ? "metrics unavailable" : `${nodes.length} nodes`}
+            <span className="flex items-center gap-2">
+              <span className="mono text-[11px] text-text-muted">
+                {metricsUnavailable ? "metrics unavailable" : `${nodes.length} nodes`}
+              </span>
+              <ObservationControl observing={observe} onToggle={() => setObserve(!observe)} />
             </span>
           </CardHeader>
           <CardBody className="pt-1">
@@ -220,8 +231,11 @@ export function WorkloadsPage() {
         <Card>
           <CardHeader>
             <CardTitle>Memory usage</CardTitle>
-            <span className="mono text-[11px] text-text-muted">
-              {metricsUnavailable ? "metrics unavailable" : `${nodes.length} nodes`}
+            <span className="flex items-center gap-2">
+              <span className="mono text-[11px] text-text-muted">
+                {metricsUnavailable ? "metrics unavailable" : `${nodes.length} nodes`}
+              </span>
+              <ObservationControl observing={observe} onToggle={() => setObserve(!observe)} />
             </span>
           </CardHeader>
           <CardBody className="pt-1">

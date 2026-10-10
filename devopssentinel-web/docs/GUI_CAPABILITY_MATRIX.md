@@ -41,7 +41,7 @@ system are marked **[live]**; rows established by reading code are marked **[cod
 | Partial state | `PartialBanner` + `Envelope.partial` | **[code]** | `PRODUCTION READY` (§59, §140) |
 | Empty / error state | `EmptyState`, `ErrorState` (impact + next safe action + raw details) | **[code]** | `PRODUCTION READY` (§138, §139, §335–§337) |
 | Loading state | `LoadingRows` skeleton | **[code]** | `GOOD` (§60, §189) |
-| Live refresh | `LiveRefresher` — `setInterval` + `refetchQueries` on non-identity keys | **[code]** explicit, visible, pauses on a hidden tab | `GOOD` (§54, §55) |
+| Live refresh | `LiveRefresher` — `setInterval` + `refetchQueries` on non-identity keys; usage charts observe the Metrics API every 5 s while their page is open | **[code]** explicit, visible, pausable, pauses on a hidden tab | `GOOD` (§54, §55) |
 | **Live transport** | **SSE exists (`api/sse.py`, `/api/v1/live`, `/api/v1/logs`) but the frontend has zero `EventSource`** | **[code]** 0 matches; polling only | `MISSING` (§53) |
 | Cache discipline | TanStack Query, 15 s `staleTime`, `retry: 1`, no refetch-on-focus | **[code]** | `GOOD` (§142) |
 | **Retry policy** | blanket `retry: 1` — retries RBAC/404/400 too | **[code]** | `INCONSISTENT` (§144) |
