@@ -22,6 +22,7 @@ from app.services.parsers import (
     normalize_logs,
     normalize_pods,
     normalize_pvcs,
+    normalize_secrets,
     normalize_services,
     normalize_workloads,
     pod_severity,
@@ -194,6 +195,44 @@ def test_normalize_workloads_derives_from_pod_owners():
 # Findings / events
 # --------------------------------------------------------------------------
 
+def test_normalize_findings_ignores_summary_and_legend_lines():
+    """A report that says `FAIL=0` must produce no findings.
+
+    Captured from the live engine when nothing was wrong:
+
+        FINDINGS\\tFAIL=0\\tWARN=0\\tUNKNOWN=3\\tINFO=0 (full detail: --health)
+        UNKNOWN\\t3 findings are data gaps, not healthy states; ...
+        TRIAGE EXIT\\t0=no FAIL 1=observed FAIL 3=auth/API failure ...
+
+    The fallback used to read each of those as a finding, so the queue showed
+    three rows while the engine reported nothing wrong (spec sections 44, 286).
+    """
+    findings = normalize_findings(
+        [
+            "FINDINGS\tFAIL=0\tWARN=0\tUNKNOWN=3\tINFO=0 (full detail: --health)",
+            "UNKNOWN\t3 findings are data gaps, not healthy states; "
+            "inspect --health coverage table",
+            "TRIAGE EXIT\t0=no FAIL 1=observed FAIL 3=auth/API failure "
+            "4=required pod inventory unavailable",
+        ]
+    )
+    assert findings == []
+
+
+def test_normalize_findings_still_reads_embedded_severity_lines():
+    """The tightened fallback must not silence genuine embedded findings."""
+    findings = normalize_findings(
+        [
+            "[FAIL] Pod/transformer-abc is not Ready",
+            "[WARN] syslog-cert | namespace=devopsonm | daysLeft=29",
+        ]
+    )
+    assert len(findings) == 2
+    assert findings[0].severity == "FAILED"
+    assert findings[0].resource == "Pod/transformer-abc"
+    assert findings[1].severity == "WARNING"
+
+
 def test_normalize_findings_from_real_triage_table():
     findings = normalize_findings(TRIAGE_TABLE, "flux-system")
     assert len(findings) == 3
@@ -250,6 +289,81 @@ def test_normalize_gitops_comparison_line_becomes_graph_edge():
     assert "Kustomization/podinfo-demo" in ids
     assert "GitRepository/podinfo-demo-source" in ids
     assert any(edge.label == "MANAGED_BY" for edge in graph.edges)
+
+
+def test_dependency_graph_edge_keeps_engine_evidence():
+    """Every edge carries the engine's own report line (spec sections 37, 347).
+
+    Without this the edge-detail panel could show a relationship but not why it
+    exists, which would make the GUI assert something the engine never said.
+    """
+    graph = normalize_dependency_graph(GITOPS_BLOCKS)
+    assert graph.edges, "fixture should produce at least one edge"
+    for edge in graph.edges:
+        assert edge.evidence, f"edge {edge.id} lost its evidence line"
+        assert "->" in edge.evidence
+
+
+def test_dependency_graph_evidence_is_bounded():
+    """A pathological report line must not be stored whole."""
+    long_line = "Pod/a -> Service/b " + ("x" * 5000)
+    graph = normalize_dependency_graph([long_line])
+    assert len(graph.edges) == 1
+    assert len(graph.edges[0].evidence) <= 300
+
+
+GITOPS_TREE = [
+    "GitOps Dependency Graph | 2026-10-09T16:17:43Z",
+    "Context: vcluster-docker_dev | Namespace: flux-system",
+    "GITOPS DEPENDENCY GRAPH | namespace=flux-system",
+    "GitRepository/devopsonm revision=main@sha1:f74034cc",
+    "\u251c\u2500\u2500 Kustomization/devopsonm ready=True applied=main@sha1:f74034cc",
+    "GitRepository/learnalgorithm-repo revision=main@sha1:4c93a767",
+    "\u251c\u2500\u2500 Kustomization/learnalgorithm-app ready=True applied=main@sha1:4c93a767",
+    "",
+    "HELM RELEASE SOURCES",
+    "",
+    "Confidence: CONFIRMED where Flux sourceRef/status.inventory explicitly links objects.",
+]
+
+
+def test_dependency_graph_reads_the_engine_tree_format():
+    """Regression: the GitOps graph is a tree, not an arrow chain.
+
+    Reading only `->` edges made this report parse to zero edges, so the console
+    said "no chain was reported" while the engine had reported one.
+    """
+    graph = normalize_dependency_graph(GITOPS_TREE)
+    ids = {node.id for node in graph.nodes}
+    assert ids == {
+        "GitRepository/devopsonm",
+        "Kustomization/devopsonm",
+        "GitRepository/learnalgorithm-repo",
+        "Kustomization/learnalgorithm-app",
+    }
+    pairs = {(edge.source, edge.target) for edge in graph.edges}
+    assert ("GitRepository/devopsonm", "Kustomization/devopsonm") in pairs
+    assert ("GitRepository/learnalgorithm-repo", "Kustomization/learnalgorithm-app") in pairs
+    # A child is attached to its own parent, never to the previous sibling's.
+    assert ("GitRepository/devopsonm", "Kustomization/learnalgorithm-app") not in pairs
+    assert all(edge.label == "MANAGED_BY" for edge in graph.edges)
+    assert all(edge.evidence for edge in graph.edges)
+
+
+def test_dependency_graph_does_not_invent_nodes_from_prose():
+    """`sourceRef/status.inventory` in a note is not a resource reference."""
+    graph = normalize_dependency_graph(GITOPS_TREE)
+    assert not any("sourceRef" in node.id for node in graph.nodes)
+    assert not any("status.inventory" in node.id for node in graph.nodes)
+
+
+def test_dependency_graph_reads_both_formats_together():
+    graph = normalize_dependency_graph(
+        ["Pod/a -> Service/b", "GitRepository/r revision=x", "\u251c\u2500\u2500 Kustomization/k ready=True"]
+    )
+    pairs = {(edge.source, edge.target) for edge in graph.edges}
+    assert ("Pod/a", "Service/b") in pairs
+    assert ("GitRepository/r", "Kustomization/k") in pairs
 
 
 # --------------------------------------------------------------------------
@@ -335,12 +449,24 @@ CERT_BLOCK = [
     "CERTIFICATES | namespace=default | TTL 60s | WARN <=30d CRITICAL <=7d",
     "SECRET METADATA | OK | cache age=0s",
     "NAME\tTYPE\tCREATED\tKEY COUNT\tKEY NAMES",
-    "demo-tls\tkubernetes.io/tls\t2026-10-04T03:31:02Z\t2\ttls.crt tls.key ",
+    "platform-cert-tls\tkubernetes.io/tls\t2026-10-04T06:06:50Z\t3\tca.crt tls.crt tls.key ",
+    "platform-postgres\tOpaque\t2026-10-04T03:32:57Z\t1\tpassword ",
+    "platform-tls\tkubernetes.io/tls\t2026-10-04T03:31:02Z\t2\ttls.crt tls.key ",
     "",
     "TLS CERTIFICATE METADATA | OK | cache age=0s",
-    "[OK] demo-tls | namespace=default | source=Secret/tls.crt certificate#1 | daysLeft=364",
-    "subject=CN = demo.sentinel.local, O = DevOpsSentinel Demo",
-    "issuer=CN = demo.sentinel.local, O = DevOpsSentinel Demo",
+    "[OK] platform-cert-tls | namespace=default | source=Secret/tls.crt certificate#1 | daysLeft=89",
+    "subject=CN = platform-cert.local",
+    "issuer=CN = platform-cert.local",
+    "serial=31C73429D1E8F24B79DDFA42C133F691",
+    "notBefore=Oct  4 06:06:50 2026 GMT",
+    "notAfter=Jan  2 06:06:50 2027 GMT",
+    "sha256 Fingerprint=4A:AC:36:7A:C9:7A:08:38:A7:CB:F1:3F:01:09:5B:4E:F3:46:27:BA:0C:BE:77:2B:E6:13:F8:EF:FD:92:8B:B2",
+    "X509v3 Subject Alternative Name: ",
+    "    DNS:platform-cert.local, DNS:platform-cert.default.svc",
+    "",
+    "[OK] platform-tls | namespace=default | source=Secret/tls.crt certificate#1 | daysLeft=364",
+    "subject=CN = sentinel.internal, O = DevOpsSentinel Platform",
+    "issuer=CN = sentinel.internal, O = DevOpsSentinel Platform",
     "serial=79DFF17B771C00EFAC61008E63164C05C0AC43ED",
     "notBefore=Oct  4 03:32:57 2026 GMT",
     "notAfter=Oct  4 03:32:57 2027 GMT",
@@ -353,15 +479,70 @@ CERT_BLOCK = [
 def test_normalize_certificates_from_real_block() -> None:
     """The engine's TLS metadata is a multi-line block, not a table."""
     certs = normalize_certificates(CERT_BLOCK, "default")
-    assert len(certs) == 1
-    cert = certs[0]
-    assert cert.name == "demo-tls"
+    assert len(certs) == 2
+    by_name = {c.name: c for c in certs}
+    cert = by_name["platform-tls"]
     assert cert.namespace == "default"
-    assert cert.cn == "demo.sentinel.local"
-    assert cert.issuer == "demo.sentinel.local"
+    assert cert.cn == "sentinel.internal"
+    assert cert.issuer == "sentinel.internal"
     assert cert.days == 364
     assert cert.status == "OK"
     assert cert.expiry.startswith("Oct  4 03:32:57 2027")
+
+
+def test_certificate_block_exposes_serial_fingerprint_and_san() -> None:
+    """Real PKI detail (serial, fingerprint, SAN, source) is surfaced."""
+    by_name = {c.name: c for c in normalize_certificates(CERT_BLOCK, "default")}
+    cert = by_name["platform-cert-tls"]
+    assert cert.serial == "31C73429D1E8F24B79DDFA42C133F691"
+    assert cert.fingerprint.startswith("4A:AC:36:7A")
+    assert cert.not_before.startswith("Oct  4 06:06:50 2026")
+    assert cert.san == "DNS:platform-cert.local, DNS:platform-cert.default.svc"
+    assert cert.source == "Secret/tls.crt certificate#1"
+    assert cert.days == 89
+    assert cert.status == "OK"
+
+
+def test_normalize_secrets_joins_tls_expiry() -> None:
+    """Secret inventory carries the certificate expiry for TLS Secrets."""
+    records = normalize_secrets(CERT_BLOCK, "default")
+    by_name = {s.name: s for s in records}
+    assert set(by_name) == {"platform-cert-tls", "platform-postgres", "platform-tls"}
+
+    tls = by_name["platform-tls"]
+    assert tls.is_tls is True
+    assert tls.type == "kubernetes.io/tls"
+    assert tls.key_count == 2
+    assert tls.keys == "tls.crt tls.key"
+    assert tls.days == 364
+    assert tls.status == "OK"
+    assert tls.expires.startswith("Oct  4 03:32:57 2027")
+
+    cert_manager = by_name["platform-cert-tls"]
+    assert cert_manager.days == 89
+    assert cert_manager.key_count == 3
+
+    # Opaque Secrets are inventoried but never claim a certificate expiry.
+    opaque = by_name["platform-postgres"]
+    assert opaque.is_tls is False
+    assert opaque.days is None
+    assert opaque.expires == ""
+
+
+def test_normalize_secrets_flags_expiring_tls_secret() -> None:
+    lines = [
+        "SECRET METADATA | OK | cache age=0s",
+        "NAME\tTYPE\tCREATED\tKEY COUNT\tKEY NAMES",
+        "soon-tls\tkubernetes.io/tls\t2026-10-01T00:00:00Z\t2\ttls.crt tls.key ",
+        "",
+        "[WARN] soon-tls | namespace=default | source=Secret/tls.crt certificate#1 | daysLeft=5",
+        "subject=CN = soon.local",
+        "notAfter=Oct  9 00:00:00 2026 GMT",
+    ]
+    records = normalize_secrets(lines, "default")
+    assert records and records[0].name == "soon-tls"
+    assert records[0].days == 5
+    assert records[0].status == "CRITICAL"
 
 
 def test_normalize_certificates_expired_block_is_critical() -> None:
@@ -379,10 +560,11 @@ def test_certificate_consumers_from_mount_references() -> None:
     lines = CERT_BLOCK + [
         "SECRET MOUNT REFERENCES | SOURCE Pod specifications | namespace=default | cache age=0s",
         "SECRET\tPOD\tVOLUME\tCONTAINER\tMOUNT PATH\tSUBPATH\tSTATUS",
-        "demo-tls\tdemo-web-1\tdata\tweb\t/etc/tls\t-\tCONFIGURED",
+        "platform-tls\tplatform-web-1\tdata\tweb\t/etc/tls\t-\tCONFIGURED",
     ]
-    certs = normalize_certificates(lines, "default")
-    assert certs[0].consumers == 1
+    by_name = {c.name: c for c in normalize_certificates(lines, "default")}
+    assert by_name["platform-tls"].consumers == 1
+    assert by_name["platform-cert-tls"].consumers == 0
 
 
 # --------------------------------------------------------------------------

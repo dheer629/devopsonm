@@ -59,7 +59,7 @@ expected_pods = {pod['metadata']['name'] for pod in pods['items']}
 record('nonempty-live-pod-baseline', bool(expected_pods), f'{len(expected_pods)} pods')
 
 modes = ['resources', 'network', 'storage', 'gitops', 'gitops-graph', 'certificates',
-         'cert-expiry', 'health', 'triage', 'etdp', 'postgres-discovery', 'kafka-discovery',
+         'cert-expiry', 'health', 'triage', 'application-profile', 'postgres-discovery', 'kafka-discovery',
          'doctor', 'capabilities', 'live-validate', 'performance', 'snapshot']
 with concurrent.futures.ThreadPoolExecutor(max_workers=3) as pool:
     jobs = {mode: pool.submit(execute, mode, ['--'+mode],
@@ -73,7 +73,7 @@ record('required-live-collectors', 'pods=OK PASS' in live_text and 'PARTIAL/FAIL
 execute('workload-triage', ['--triage-workload', 'Deployment/'+args.workload], (0, 1, 4))
 dependency, _ = execute('dependency', ['--dependency', 'Deployment/'+args.workload])
 if args.namespace == 'devopsonm':
-    record('deployment-service-correlation', 'Service: sentinel-demo' in '\n'.join((dependency or {}).get('lines', [])))
+    record('deployment-service-correlation', 'Service: sentinel-platform' in '\n'.join((dependency or {}).get('lines', [])))
 execute('quiet-resources', ['--resources', '--quiet'], structured=False)
 execute('offline-self-test', ['--self-test'], structured=False)
 execute('ui-debug', ['--ui-debug'], structured=False)

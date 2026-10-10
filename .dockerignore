@@ -1,3 +1,15 @@
+# Default-deny keeps the CLI engine image (root Dockerfile) context minimal.
 *
 !Dockerfile
 !DevOps_K8s_Sentinel_FINAL_GP.sh
+
+# Browser edition (devopssentinel-web/Dockerfile). The project directory is
+# re-included, then the heavy local-only directories are dropped again.
+!devopssentinel-web
+devopssentinel-web/frontend/node_modules
+devopssentinel-web/backend/.venv
+devopssentinel-web/.venv
+devopssentinel-web/dist-package
+devopssentinel-web/frontend/test-results
+devopssentinel-web/frontend/playwright-report
+devopssentinel-web/.pytest_cache

@@ -2,16 +2,24 @@
 
 from __future__ import annotations
 
+import asyncio
+
 import pytest
 
 from app.services.kube import (
     KubeError,
     _validate,
+    command_string,
+    describe_argv,
+    events_argv,
+    logs_argv,
+    namespace_events,
     parse_cpu,
     parse_memory,
     parse_node_address,
     parse_top_nodes,
     parse_top_pods,
+    pod_containers,
 )
 
 
@@ -89,15 +97,15 @@ def test_parse_memory(raw, byte_count):
 
 def test_parse_top_pods_reads_the_kubectl_columns():
     output = (
-        "demo-kafka-54c877b698-ds669   3m      364Mi\n"
-        "demo-postgres-69b874798-hr8nh  12m     18Mi\n"
-        "demo-web-75899ccfd7-ckpcg      0       11Mi\n"
+        "platform-kafka-54c877b698-ds669   3m      364Mi\n"
+        "platform-postgres-69b874798-hr8nh  12m     18Mi\n"
+        "platform-web-75899ccfd7-ckpcg      0       11Mi\n"
     )
     rows = parse_top_pods(output)
     assert [row["name"] for row in rows] == [
-        "demo-kafka-54c877b698-ds669",
-        "demo-postgres-69b874798-hr8nh",
-        "demo-web-75899ccfd7-ckpcg",
+        "platform-kafka-54c877b698-ds669",
+        "platform-postgres-69b874798-hr8nh",
+        "platform-web-75899ccfd7-ckpcg",
     ]
     assert rows[0]["cpuMillicores"] == 3
     assert rows[0]["memoryBytes"] == 364 * 1024**2
@@ -142,3 +150,176 @@ def test_node_address_cannot_be_turned_into_a_mutation():
     ):
         with pytest.raises((KubeError, PermissionError)):
             _validate(bad)
+
+
+# --------------------------------------------------------------------------
+# Log viewer allowlist + argv
+# --------------------------------------------------------------------------
+
+def test_allows_logs_with_the_viewer_option_surface():
+    _validate(["logs", "platform-web-abc"])
+    _validate(["logs", "platform-web-abc", "-c", "web", "--tail=500"])
+    _validate(
+        [
+            "--context", "c", "--namespace", "default",
+            "logs", "platform-web-abc", "-c", "web",
+            "--tail=1000", "--since=30m", "--previous=true", "--timestamps=true",
+        ]
+    )
+
+
+def test_blocks_disallowed_logs_flags():
+    for bad in (
+        ["logs"],
+        ["logs", "platform-web-abc", "--follow"],
+        ["logs", "platform-web-abc", "--tail=abc"],
+        ["logs", "platform-web-abc", "--since=1d"],
+        ["logs", "platform-web-abc", "-c", "Bad_Name"],
+        ["logs", "platform-web-abc", "--tail"],
+        ["logs", "platform-web-abc", "extra-positional"],
+    ):
+        with pytest.raises(KubeError):
+            _validate(bad)
+
+
+def test_logs_argv_is_read_only_and_bounded():
+    argv = logs_argv(
+        "platform-web-abc",
+        context="c",
+        namespace="default",
+        container="web",
+        tail=1000,
+        since="30m",
+        previous=True,
+        timestamps=True,
+    )
+    assert argv[:2] == ["--context", "c"]
+    assert "--namespace" in argv and "default" in argv
+    assert argv[-6:] == [
+        "logs", "platform-web-abc", "-c", "web", "--tail=1000",
+        "--since=30m",
+    ] or argv[-8:] == [
+        "logs", "platform-web-abc", "-c", "web", "--tail=1000",
+        "--since=30m", "--previous=true", "--timestamps=true",
+    ]
+    assert argv[-2:] == ["--previous=true", "--timestamps=true"]
+
+
+def test_logs_argv_omits_since_when_empty():
+    argv = logs_argv("pod-x", namespace="default")
+    assert argv == ["--namespace", "default", "logs", "pod-x", "--tail=500",
+                    "--timestamps=true"]
+
+
+# --------------------------------------------------------------------------
+# Resource description allowlist + argv
+# --------------------------------------------------------------------------
+
+def test_allows_describe_and_get_for_non_secret_kinds():
+    _validate(["describe", "Deployment", "platform-web"])
+    _validate(["get", "deployment", "platform-web", "-o", "yaml"])
+    _validate(["--context", "c", "--namespace", "default", "get", "pod", "p", "-o", "json"])
+    _validate(["get", "events", "-o", "json"])
+
+
+def test_blocks_secret_and_unknown_describe_targets():
+    for bad in (
+        ["describe", "Secret", "platform-tls"],
+        ["get", "secret", "platform-tls", "-o", "yaml"],
+        ["get", "secrets"],
+        ["describe", "Deployment"],  # missing name
+        ["get", "deployment", "platform-web", "-o", "wide"],
+        ["describe", "Deployment", "platform-web", "extra"],
+        ["get", "events", "--field-selector", "x=y"],
+    ):
+        with pytest.raises((KubeError, PermissionError)):
+            _validate(bad)
+
+
+def test_describe_argv_formats():
+    assert describe_argv("Deployment", "web", fmt="describe")[-3:] == [
+        "describe", "Deployment", "web",
+    ]
+    assert describe_argv("Deployment", "web", fmt="yaml")[-5:] == [
+        "get", "Deployment", "web", "-o", "yaml",
+    ]
+    with pytest.raises(KubeError):
+        describe_argv("Deployment", "web", fmt="wide")
+
+
+def test_events_argv_shape():
+    assert events_argv(context="c", namespace="default") == [
+        "--context", "c", "--namespace", "default", "get", "events", "-o", "json",
+    ]
+
+
+def test_command_string_quotes_arguments():
+    assert command_string(["logs", "pod", "--tail=500"]) == "kubectl logs pod --tail=500"
+
+
+# --------------------------------------------------------------------------
+# pod_containers / namespace_events JSON parsing (kubectl mocked)
+# --------------------------------------------------------------------------
+
+def _stub_run(monkeypatch, out: str, rc: int = 0, err: str = "") -> None:
+    from app.services import kube
+
+    async def fake(args, timeout: float = 15.0):
+        return rc, out, err
+
+    monkeypatch.setattr(kube, "_run", fake)
+
+
+def test_pod_containers_reads_init_app_and_ephemeral(monkeypatch):
+    payload = (
+        '{"spec":{"initContainers":[{"name":"init"}],'
+        '"containers":[{"name":"web"},{"name":"sidecar"}],'
+        '"ephemeralContainers":[{"name":"debugger"}]}}'
+    )
+    _stub_run(monkeypatch, payload)
+    assert asyncio.run(pod_containers("pod-x")) == ["init", "web", "sidecar", "debugger"]
+
+
+def test_pod_containers_survives_non_json(monkeypatch):
+    _stub_run(monkeypatch, "not json")
+    assert asyncio.run(pod_containers("pod-x")) == []
+
+
+def test_namespace_events_filters_by_involved_object(monkeypatch):
+    payload = (
+        '{"items":['
+        '{"lastTimestamp":"2026-10-03T00:00:00Z","type":"Warning","reason":"BackOff",'
+        '"count":3,"message":"back-off","involvedObject":{"kind":"Pod","name":"web"}},'
+        '{"lastTimestamp":"2026-10-03T00:01:00Z","type":"Normal","reason":"Pulled",'
+        '"involvedObject":{"kind":"Pod","name":"other"}}'
+        "]}"
+    )
+    _stub_run(monkeypatch, payload)
+    rows = asyncio.run(namespace_events(namespace="default", name="web"))
+    assert len(rows) == 1
+    assert rows[0]["reason"] == "BackOff"
+    assert rows[0]["object"] == "Pod/web"
+    assert rows[0]["count"] == 3
+
+
+def test_events_argv_is_cluster_wide_without_a_namespace():
+    """No namespace must mean the whole cluster, not just ``default``."""
+    assert events_argv(context="c") == [
+        "--context", "c", "--all-namespaces", "get", "events", "-o", "json",
+    ]
+    assert events_argv() == ["--all-namespaces", "get", "events", "-o", "json"]
+
+
+def test_namespace_events_labels_cluster_wide_rows_with_their_namespace(monkeypatch):
+    """Rows from different namespaces must stay distinguishable in one table."""
+    payload = (
+        '{"items":['
+        '{"lastTimestamp":"2026-10-03T00:00:00Z","type":"Warning","reason":"BackOff",'
+        '"involvedObject":{"kind":"Pod","name":"web","namespace":"flux-system"}}'
+        "]}"
+    )
+    _stub_run(monkeypatch, payload)
+    rows = asyncio.run(namespace_events())
+    assert len(rows) == 1
+    assert rows[0]["object"] == "flux-system/Pod/web"
+

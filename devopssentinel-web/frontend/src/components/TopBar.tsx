@@ -1,17 +1,104 @@
 import { useIsFetching, useQueryClient } from "@tanstack/react-query";
-import { RefreshCw, Search, ShieldCheck } from "lucide-react";
+import { PlugZap, RefreshCw, Search, ShieldCheck } from "lucide-react";
 import { useCallback, useEffect } from "react";
 
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tooltip } from "@/components/ui/primitives";
 import { ThemeMenu } from "@/components/ThemeMenu";
-import { useContexts, useNamespaces, useSystem } from "@/api/queries";
+import {
+  useAutoConnectOnLoad,
+  useAutoDetectConnection,
+  useConnections,
+  useContexts,
+  useNamespaces,
+  useSystem,
+} from "@/api/queries";
 import { useApp, type LiveInterval } from "@/state/AppContext";
 
 const LIVE_OPTIONS: LiveInterval[] = [0, 5, 10, 30, 60];
 
-export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
+/**
+ * Cluster connection state, and the button that fixes it.
+ *
+ * The badge reports what is *true* rather than what is configured: the backend
+ * probes the active connection and reports reachability separately from
+ * presence, because a saved vcluster override goes stale when the cluster
+ * restarts and the published port moves. When the connection is missing or
+ * dead, this component also runs the automatic connect once per page load, so
+ * the operator normally never has to press anything.
+ */
+function ConnectionStatus() {
+  const connections = useConnections();
+  const autoDetect = useAutoDetectConnection();
+  const data = connections.data?.data;
+  const active = data?.active ?? null;
+  const health = data?.health ?? null;
+
+  // Only ask for a connection once the backend has answered, and only when the
+  // one we have is missing or unreachable.
+  const needsConnection = Boolean(data) && !health?.reachable;
+  useAutoConnectOnLoad(needsConnection);
+
+  const probing = autoDetect.isPending || (Boolean(needsConnection) && connections.isFetching);
+
+  if (!data) {
+    return (
+      <Badge tone="neutral" className="mono">
+        CONNECTING…
+      </Badge>
+    );
+  }
+
+  if (health?.reachable) {
+    return (
+      <Tooltip
+        content={`Connected to ${health.server || active?.server || "the cluster"}${
+          health.serverVersion ? ` (${health.serverVersion})` : ""
+        }`}
+      >
+        <Badge tone="ok" className="mono">
+          {health.context || active?.context || "CONNECTED"}
+        </Badge>
+      </Tooltip>
+    );
+  }
+
+  return (
+    <span className="flex items-center gap-1">
+      <Tooltip
+        content={
+          health?.configured
+            ? `The saved connection is not answering: ${health.detail || health.reason}`
+            : "No cluster is connected, so every cluster page is empty."
+        }
+      >
+        <Badge tone={probing ? "info" : "critical"} className="mono">
+          {probing ? "CONNECTING…" : health?.configured ? "UNREACHABLE" : "NOT CONNECTED"}
+        </Badge>
+      </Tooltip>
+      <Button
+        variant="soft"
+        size="sm"
+        disabled={probing}
+        onClick={() => autoDetect.mutate({ force: true })}
+        title="Detect a reachable cluster and connect"
+      >
+        <PlugZap className="h-3.5 w-3.5" aria-hidden="true" />
+        Connect
+      </Button>
+    </span>
+  );
+}
+
+export function TopBar({
+  onOpenPalette,
+  onOpenHelp,
+}: {
+  onOpenPalette: () => void;
+  onOpenHelp: () => void;
+}) {
   const {
     context,
     setContext,
@@ -68,6 +155,7 @@ export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
           SUPERVISION [READ ONLY]
         </Badge>
         {debug ? <Badge tone="warning">DEBUG</Badge> : null}
+        <ConnectionStatus />
       </div>
 
       <button
@@ -80,6 +168,17 @@ export function TopBar({ onOpenPalette }: { onOpenPalette: () => void }) {
         <span className="flex-1">Search resources and commands…</span>
         <kbd className="mono rounded-sm border border-border px-1.5 text-[10px]">Ctrl K</kbd>
       </button>
+
+      <Tooltip content="Keyboard shortcuts (?)">
+        <button
+          type="button"
+          onClick={onOpenHelp}
+          aria-label="Keyboard shortcuts"
+          className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-border text-[12px] text-text-muted transition-colors hover:border-border-strong hover:text-text"
+        >
+          ?
+        </button>
+      </Tooltip>
 
       <div className="ml-auto flex flex-wrap items-center gap-2">
         <label className="flex items-center gap-1 text-[11px] text-text-muted">

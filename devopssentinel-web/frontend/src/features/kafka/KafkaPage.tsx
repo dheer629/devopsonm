@@ -26,7 +26,7 @@ import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { reportText } from "@/lib/format";
-import { DEMO_KAFKA_PORT, resolveLiveHost } from "@/lib/live";
+import { PLATFORM_KAFKA_PORT, resolveLiveHost } from "@/lib/live";
 import { useApp } from "@/state/AppContext";
 import type { KafkaServiceResource } from "@/types";
 
@@ -76,7 +76,7 @@ export function KafkaPage() {
   );
   const [brokerHost, setBrokerHost] = useState(suggestedHost);
   const [hostTouched, setHostTouched] = useState(false);
-  const [brokerPort, setBrokerPort] = useState(DEMO_KAFKA_PORT);
+  const [brokerPort, setBrokerPort] = useState(PLATFORM_KAFKA_PORT);
   const topicsEnabled = Boolean(consoleStatus.data?.data.enabled);
   const listing = listTopics.data?.data;
 
@@ -89,7 +89,7 @@ export function KafkaPage() {
   const useDemoBroker = () => {
     setBrokerHost(suggestedHost);
     setHostTouched(false);
-    setBrokerPort(DEMO_KAFKA_PORT);
+    setBrokerPort(PLATFORM_KAFKA_PORT);
   };
 
   const columns = useMemo<ColumnDef<KafkaServiceResource, unknown>[]>(
@@ -169,11 +169,11 @@ export function KafkaPage() {
                 No Kafka broker Service was reported in{" "}
                 <span className="mono">{scope.namespace || "this namespace"}</span>, so there are no
                 topics to list. Services whose name or labels contain <span className="mono">kafka</span>{" "}
-                are reported. The bundled demo broker lives in namespace{" "}
+                are reported. The bundled platform broker lives in namespace{" "}
                 <span className="mono">default</span> — switch the namespace picker, or point the{" "}
                 <span className="mono">Topics</span> tab at{" "}
                 <span className="mono">
-                  {suggestedHost}:{DEMO_KAFKA_PORT}
+                  {suggestedHost}:{PLATFORM_KAFKA_PORT}
                 </span>
                 .
               </p>
@@ -279,18 +279,18 @@ export function KafkaPage() {
                     List topics
                   </Button>
                   <Button variant="outline" size="sm" onClick={useDemoBroker}>
-                    Use demo broker
+                    Use platform broker
                   </Button>
                   {listTopics.isPending ? (
                     <span className="text-[11.5px] text-text-muted">asking the broker…</span>
                   ) : null}
                 </div>
                 <p className="text-[11px] text-text-faint">
-                  Host prefills with the cluster node address, because the bundled demo broker is a
+                  Host prefills with the cluster node address, because the bundled platform broker is a
                   NodePort and answers on a node — not on <span className="mono">127.0.0.1</span>. The
-                  demo endpoint is{" "}
+                  platform endpoint is{" "}
                   <span className="mono">
-                    {suggestedHost}:{DEMO_KAFKA_PORT}
+                    {suggestedHost}:{PLATFORM_KAFKA_PORT}
                   </span>{" "}
                   (namespace <span className="mono">default</span>).
                 </p>

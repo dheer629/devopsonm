@@ -6,6 +6,8 @@ import { installFixtures } from "./fixtures";
 const ROUTES = [
   "/dashboard",
   "/workloads",
+  "/logs",
+  "/describe",
   "/findings",
   "/pki",
   "/gitops",

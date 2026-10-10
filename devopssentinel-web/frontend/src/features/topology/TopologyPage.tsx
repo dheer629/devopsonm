@@ -13,6 +13,8 @@ import { Waypoints } from "lucide-react";
 
 import {
   useCertificates,
+  useConsumers,
+  useFailurePath,
   useGitOps,
   useGitOpsGraph,
   useGraph,
@@ -21,8 +23,10 @@ import {
   useWorkloads,
 } from "@/api/queries";
 import {
+  ConfidenceTag,
   EmptyState,
   ErrorState,
+  Field,
   Freshness,
   LoadingRows,
   PageHeader,
@@ -41,7 +45,7 @@ import {
 } from "@/components/ui/select";
 import { SEVERITY } from "@/lib/status";
 import { useApp } from "@/state/AppContext";
-import type { Graph } from "@/types";
+import type { FailurePath, Graph, GraphEdge } from "@/types";
 
 const STATE_STROKE: Record<string, string> = {
   OK: "var(--c-success)",
@@ -67,7 +71,15 @@ const KINDS = [
   "GitRepository",
 ];
 
-function toFlow(graph: Graph, depth: number, rootId: string): { nodes: Node[]; edges: Edge[] } {
+function toFlow(
+  graph: Graph,
+  depth: number,
+  rootId: string,
+  options: { direction: "horizontal" | "vertical"; highlight: Set<string> } = {
+    direction: "horizontal",
+    highlight: new Set<string>(),
+  },
+): { nodes: Node[]; edges: Edge[] } {
   const adjacency = new Map<string, string[]>();
   for (const edge of graph.edges) {
     adjacency.set(edge.source, [...(adjacency.get(edge.source) ?? []), edge.target]);
@@ -92,6 +104,8 @@ function toFlow(graph: Graph, depth: number, rootId: string): { nodes: Node[]; e
     }
   }
 
+  // Deterministic layout: the same graph always renders in the same place, so
+  // a refresh never shuffles the picture under the operator (spec section 42).
   const columns = new Map<number, number>();
   const nodes: Node[] = graph.nodes
     .filter((node) => allowed.has(node.id))
@@ -99,9 +113,13 @@ function toFlow(graph: Graph, depth: number, rootId: string): { nodes: Node[]; e
       const column = Math.floor(index / 4);
       const row = columns.get(column) ?? 0;
       columns.set(column, row + 1);
+      const position =
+        options.direction === "horizontal"
+          ? { x: column * 300, y: row * 90 }
+          : { x: row * 260, y: column * 110 };
       return {
         id: node.id,
-        position: { x: column * 300, y: row * 90 },
+        position,
         data: { label: node.id, state: node.state, domain: node.domain },
         style: {
           border: `1px solid ${STATE_STROKE[node.state] ?? "var(--border)"}`,
@@ -118,17 +136,26 @@ function toFlow(graph: Graph, depth: number, rootId: string): { nodes: Node[]; e
 
   const edges: Edge[] = graph.edges
     .filter((edge) => allowed.has(edge.source) && allowed.has(edge.target))
-    .map((edge) => ({
-      id: edge.id,
-      source: edge.source,
-      target: edge.target,
-      label: edge.label,
-      style: {
-        stroke: edge.confidence === "CONFIRMED" ? "var(--c-success)" : "var(--border-strong)",
-        strokeDasharray: edge.confidence === "CONFIRMED" ? undefined : "4 3",
-      },
-      labelStyle: { fill: "var(--text-muted)", fontSize: 9 },
-    }));
+    .map((edge) => {
+      const onPath = options.highlight.has(edge.id);
+      return {
+        id: edge.id,
+        source: edge.source,
+        target: edge.target,
+        label: edge.label,
+        animated: onPath,
+        style: {
+          stroke: onPath
+            ? "var(--c-critical)"
+            : edge.confidence === "CONFIRMED"
+              ? "var(--c-success)"
+              : "var(--border-strong)",
+          strokeWidth: onPath ? 2 : 1,
+          strokeDasharray: edge.confidence === "CONFIRMED" || onPath ? undefined : "4 3",
+        },
+        labelStyle: { fill: "var(--text-muted)", fontSize: 9 },
+      };
+    });
 
   return { nodes, edges };
 }
@@ -146,6 +173,12 @@ export function TopologyPage() {
   const [hideHealthy, setHideHealthy] = useState(false);
   const [failureOnly, setFailureOnly] = useState(false);
   const [search, setSearch] = useState("");
+  // Graph modes (spec sections 40, 41). "deps" is the plain dependency graph;
+  // "failure" asks the engine which nodes it actually marked unhealthy;
+  // "blast" follows references back to find every consumer.
+  const [mode, setMode] = useState<"deps" | "failure" | "blast">("deps");
+  const [direction, setDirection] = useState<"horizontal" | "vertical">("horizontal");
+  const [selectedEdge, setSelectedEdge] = useState<GraphEdge | null>(null);
 
   // Discover selectable resources from the cluster instead of asking the
   // operator to type an identifier from memory.
@@ -194,23 +227,87 @@ export function TopologyPage() {
 
   const dependency = useGraph(scope, kind, name, !isGitOpsGraph && Boolean(name));
   const gitops = useGitOpsGraph(scope, isGitOpsGraph);
+  const failurePath = useFailurePath(
+    scope,
+    kind,
+    name,
+    !isGitOpsGraph && mode === "failure" && Boolean(name),
+  );
+  const consumers = useConsumers(
+    scope,
+    kind,
+    name,
+    !isGitOpsGraph && mode === "blast" && Boolean(name),
+  );
 
-  const active = isGitOpsGraph ? gitops : dependency;
+  const active = isGitOpsGraph
+    ? gitops
+    : mode === "failure"
+      ? failurePath
+      : mode === "blast"
+        ? consumers
+        : dependency;
   const envelope = active.data?.envelope;
-  const rawGraph = envelope?.data;
-  const graph: Graph =
-    rawGraph && Array.isArray(rawGraph.nodes) && Array.isArray(rawGraph.edges)
-      ? rawGraph
-      : { nodes: [], edges: [] };
+  const rawData = envelope?.data;
+
+  // The three endpoints wrap the graph differently (bare Graph, FailurePath,
+  // ReverseDependencies), so unwrap once here rather than at every use site.
+  const graph: Graph = useMemo(() => {
+    if (!rawData) return { nodes: [], edges: [] };
+    const candidate = (rawData as { graph?: Graph }).graph ?? (rawData as unknown as Graph);
+    if (Array.isArray(candidate?.nodes) && Array.isArray(candidate?.edges)) return candidate;
+    return { nodes: [], edges: [] };
+  }, [rawData]);
+
   const rootId = `${kind}/${name}`;
 
+  // Edges the engine tied to an unhealthy node, and the nodes it flagged.
+  const failure = rawData as FailurePath | undefined;
+  const highlight = useMemo(
+    () =>
+      mode === "failure"
+        ? new Set((failure?.pathEdges ?? []).map((edge) => edge.id))
+        : new Set<string>(),
+    [mode, failure],
+  );
+  const unhealthy = useMemo(
+    () => (mode === "failure" ? new Set(failure?.unhealthy ?? []) : new Set<string>()),
+    [mode, failure],
+  );
+
+  // Blast radius: follow references backwards from the selected object, so the
+  // view answers "what breaks if this changes?" rather than "what does it need?".
+  const blastNodes = useMemo(() => {
+    if (mode !== "blast") return null;
+    const reverse = new Map<string, string[]>();
+    for (const edge of graph.edges) {
+      reverse.set(edge.target, [...(reverse.get(edge.target) ?? []), edge.source]);
+    }
+    const seen = new Set<string>([rootId]);
+    let frontier = [rootId];
+    while (frontier.length > 0) {
+      const next: string[] = [];
+      for (const node of frontier) {
+        for (const source of reverse.get(node) ?? []) {
+          if (!seen.has(source)) {
+            seen.add(source);
+            next.push(source);
+          }
+        }
+      }
+      frontier = next;
+    }
+    return seen;
+  }, [mode, graph, rootId]);
+
   const { nodes, edges } = useMemo(() => {
-    const base = toFlow(graph, Number(depth), rootId);
+    const base = toFlow(graph, Number(depth), rootId, { direction, highlight });
     const needle = search.trim().toLowerCase();
     const visible = new Set(
       base.nodes
         .filter((node) => {
           const data = node.data as { domain?: string; state?: string };
+          if (blastNodes && !blastNodes.has(node.id)) return false;
           if (domain !== "ALL" && data.domain !== domain) return false;
           if (hideHealthy && data.state === "OK") return false;
           if (failureOnly && !["FAILED", "CRITICAL", "WARNING"].includes(data.state ?? "")) {
@@ -225,7 +322,7 @@ export function TopologyPage() {
       nodes: base.nodes.filter((node) => visible.has(node.id)),
       edges: base.edges.filter((edge) => visible.has(edge.source) && visible.has(edge.target)),
     };
-  }, [graph, depth, rootId, domain, hideHealthy, failureOnly, search]);
+  }, [graph, depth, rootId, domain, hideHealthy, failureOnly, search, direction, highlight, blastNodes]);
 
   return (
     <div className="space-y-3">
@@ -313,12 +410,39 @@ export function TopologyPage() {
           >
             Hide healthy
           </Button>
+          {!isGitOpsGraph ? (
+            <Select
+              value={mode}
+              onValueChange={(value) => setMode(value as "deps" | "failure" | "blast")}
+            >
+              <SelectTrigger className="w-40" aria-label="Graph mode">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="deps">Dependencies</SelectItem>
+                <SelectItem value="failure">Failure path</SelectItem>
+                <SelectItem value="blast">Blast radius</SelectItem>
+              </SelectContent>
+            </Select>
+          ) : null}
+          <Select
+            value={direction}
+            onValueChange={(value) => setDirection(value as "horizontal" | "vertical")}
+          >
+            <SelectTrigger className="w-32" aria-label="Layout direction">
+              <SelectValue />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="horizontal">Horizontal</SelectItem>
+              <SelectItem value="vertical">Vertical</SelectItem>
+            </SelectContent>
+          </Select>
           <Button
             variant={failureOnly ? "primary" : "outline"}
             size="sm"
             onClick={() => setFailureOnly((v) => !v)}
           >
-            Failure path
+            Unhealthy only
           </Button>
           <Button
             variant={isGitOpsGraph ? "primary" : "soft"}
@@ -335,6 +459,40 @@ export function TopologyPage() {
           ) : null}
         </CardBody>
       </Card>
+
+      {mode === "failure" && !isGitOpsGraph ? (
+        <p className="text-[11.5px] text-text-muted">
+          <strong className="font-semibold text-text">Failure path.</strong>{" "}
+          {unhealthy.size > 0 ? (
+            <>
+              {unhealthy.size} node{unhealthy.size === 1 ? "" : "s"} named by the engine&apos;s
+              findings; the highlighted edges are the ones attached to them.{" "}
+            </>
+          ) : (
+            <>
+              No node in this graph was named by the engine&apos;s findings, so nothing is
+              highlighted.{" "}
+            </>
+          )}
+          {failure?.healthSource ? (
+            <>
+              Health is read from <span className="mono">{failure.healthSource}</span> — the
+              dependency report describes structure, not state.{" "}
+            </>
+          ) : null}
+          {failure?.note ?? ""}
+        </p>
+      ) : null}
+      {mode === "blast" && !isGitOpsGraph ? (
+        <p className="text-[11.5px] text-text-muted">
+          <strong className="font-semibold text-text">Blast radius.</strong> Following references
+          backwards from <span className="mono">{rootId}</span> found{" "}
+          {Math.max((blastNodes?.size ?? 1) - 1, 0)} consumer
+          {Math.max((blastNodes?.size ?? 1) - 1, 0) === 1 ? "" : "s"}. Relationships are the
+          engine&apos;s own edges, so they carry an explicit confidence rather than a claim of
+          causality.
+        </p>
+      ) : null}
 
       <Card>
         <CardBody className="p-0">
@@ -369,6 +527,9 @@ export function TopologyPage() {
                   const [nodeKind, ...rest] = node.id.split("/");
                   if (nodeKind && rest.length) setSelection({ kind: nodeKind, name: rest.join("/") });
                 }}
+                onEdgeClick={(_, edge) => {
+                  setSelectedEdge(graph.edges.find((item) => item.id === edge.id) ?? null);
+                }}
               >
                 <Background color="var(--border)" gap={20} />
                 <Controls showInteractive={false} />
@@ -381,6 +542,46 @@ export function TopologyPage() {
                   }
                 />
               </ReactFlow>
+            </div>
+          ) : null}
+
+          {/* Edge evidence (spec sections 37, 347): every relationship can say
+              why it exists, and never claims more than the engine reported. */}
+          {selectedEdge ? (
+            <div className="border-t border-border p-3">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h3 className="text-[12px] font-semibold uppercase tracking-wide text-text-muted">
+                    Relationship
+                  </h3>
+                  <div className="mono mt-0.5 break-all text-[12.5px] text-text">
+                    {selectedEdge.source} → {selectedEdge.target}
+                  </div>
+                </div>
+                <Button variant="ghost" size="sm" onClick={() => setSelectedEdge(null)}>
+                  Close
+                </Button>
+              </div>
+              <dl className="mt-1 max-w-3xl">
+                <Field label="Kind">
+                  <span className="mono">{selectedEdge.label}</span>
+                </Field>
+                <Field label="Confidence">
+                  <ConfidenceTag confidence={selectedEdge.confidence} />
+                </Field>
+                <Field label="Evidence" mono>
+                  <span title={selectedEdge.evidence}>
+                    {selectedEdge.evidence || "the engine reported this edge without a source line"}
+                  </span>
+                </Field>
+                <Field label="Source">
+                  <span className="mono">{envelope?.source ?? "UNAVAILABLE"}</span>
+                </Field>
+              </dl>
+              <p className="mt-1 text-[11px] text-text-faint">
+                Evidence is the engine&apos;s own report line. DevOpsSentinel does not infer a
+                relationship the engine did not state.
+              </p>
             </div>
           ) : null}
         </CardBody>

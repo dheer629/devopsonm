@@ -63,13 +63,33 @@ REPORTS = {
         "WARN\tEVENTS\tPod/log-transformer-def\tBackOff: Back-off restarting failed "
         "container\tOBSERVED retained event count=3 latest=2026-10-03T00:00:00Z\t"
         "Event timeline",
+        # Names a node that also appears in the `dependency` fixture, so the
+        # failure-path correlation (findings -> graph node) is testable.
+        "WARN\tRESTARTS\tPod/transformer-abc\tRestart count 3\t"
+        "OBSERVED cumulative count; not a restart rate\tPod inspector",
     ],
     "certificates": [
         "CERTIFICATES | namespace=devopsonm | TTL 60s | WARN <=30d CRITICAL <=7d",
+        "SECRET METADATA | OK | cache age=0s",
+        "NAME\tTYPE\tCREATED\tKEY COUNT\tKEY NAMES",
+        "syslog-cert\tkubernetes.io/tls\t2026-01-01T00:00:00Z\t2\ttls.crt tls.key ",
+        "transformer-tls\tkubernetes.io/tls\t2026-01-01T00:00:00Z\t2\ttls.crt tls.key ",
+        "transformer-db\tOpaque\t2026-01-01T00:00:00Z\t1\tpassword ",
+        "",
         "TLS CERTIFICATE METADATA | OK | cache age=0s",
-        "NAME\tCN\tISSUER\tNOT AFTER\tDAYS\tSTATUS\tCONSUMERS",
-        "syslog-cert\tsyslog.local\tinternal-ca\t2026-11-01T00:00:00Z\t29\tWARN\t3",
-        "transformer-tls\ttransformer.svc\tinternal-ca\t2027-06-01T00:00:00Z\t240\tOK\t1",
+        "[WARN] syslog-cert | namespace=devopsonm | source=Secret/tls.crt certificate#1 | daysLeft=29",
+        "subject=CN = syslog.local",
+        "issuer=CN = internal-ca",
+        "serial=ABCDEF0123456789",
+        "notBefore=Jan  1 00:00:00 2026 GMT",
+        "notAfter=Nov  1 00:00:00 2026 GMT",
+        "",
+        "[OK] transformer-tls | namespace=devopsonm | source=Secret/tls.crt certificate#1 | daysLeft=240",
+        "subject=CN = transformer.svc",
+        "issuer=CN = internal-ca",
+        "serial=0011223344556677",
+        "notBefore=Jan  1 00:00:00 2026 GMT",
+        "notAfter=Jun  1 00:00:00 2027 GMT",
     ],
     "gitops": [
         "GITOPS / FLUX | context=vcluster-docker_dev namespace=flux-system",
@@ -142,10 +162,32 @@ REPORTS = {
         "Evidence bundle created for %VALUE%",
     ],
     "gitops-graph": [
-        "GitRepository/devopsonm -> Kustomization/devopsonm: NO_DRIFT_EVIDENCE (revision matches)",
-        "Kustomization/devopsonm -> HelmRelease/transformer: NO_DRIFT_EVIDENCE",
+        "GitOps Dependency Graph | 2026-10-09T16:17:43Z",
+        "Context: vcluster-docker_dev | Namespace: flux-system",
+        "GITOPS DEPENDENCY GRAPH | namespace=flux-system",
+        "GitRepository/devopsonm revision=main@sha1:f74034cc44c9224d2f72afeae6806f018f3ad4e1",
+        "\u251c\u2500\u2500 Kustomization/devopsonm ready=True "
+        "applied=main@sha1:f74034cc44c9224d2f72afeae6806f018f3ad4e1",
+        "GitRepository/learnalgorithm-repo revision=main@sha1:4c93a76723828c70efb901059794c099b05c32dc",
+        "\u251c\u2500\u2500 Kustomization/learnalgorithm-app ready=True "
+        "applied=main@sha1:4c93a76723828c70efb901059794c099b05c32dc",
+        "",
+        "HELM RELEASE SOURCES",
+        "",
+        # Deliberate trap: this prose contains `sourceRef/status.inventory`.
+        # A naive `Kind/name` search would invent a node from it.
+        "Confidence: CONFIRMED where Flux sourceRef/status.inventory explicitly "
+        "links objects; otherwise UNKNOWN.",
     ],
-    "etdp": ["Log Transformer -> TLS Secret -> CA Bundle -> Service"],
+    "cert-expiry": [
+        "CERTIFICATE EXPIRY AUDIT | namespace=devopsonm | CRITICAL<=7d WARNING<=30d ATTENTION<=60d",
+        "NAMESPACE\tOBJECT\tCN/SAN\tISSUER\tEXPIRY\tDAYS\tSTATUS",
+        "devopsonm\tSecret/syslog-cert\tsyslog.local\tCN=internal-ca\t"
+        "Nov  1 00:00:00 2026 GMT\t29\tWARNING",
+        "devopsonm\tSecret/transformer-tls\ttransformer.svc\tCN=internal-ca\t"
+        "Jun  1 00:00:00 2027 GMT\t240\tOK",
+    ],
+    "application-profile": ["Log Transformer -> TLS Secret -> CA Bundle -> Service"],
     "postgres-discovery": [
         "POSTGRESQL / GENERIC DB DISCOVERY | namespace=devopsonm",
         "SERVICE\tTYPE\tPORT\tCLUSTER IP\tEXTERNAL IP\tREADY ENDPOINT\tDATABASE\tUSERNAME",

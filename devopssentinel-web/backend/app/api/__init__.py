@@ -1,6 +1,17 @@
 """API routers for DevOpsSentinel Web."""
 
-from . import gitops, graph, network, operations, pki, storage, system, workloads
+from . import (
+    connections,
+    gitops,
+    graph,
+    inspect,
+    network,
+    operations,
+    pki,
+    storage,
+    system,
+    workloads,
+)
 
 __all__ = [
     "system",
@@ -11,4 +22,6 @@ __all__ = [
     "network",
     "storage",
     "operations",
+    "inspect",
+    "connections",
 ]

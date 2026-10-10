@@ -21,7 +21,10 @@ from .resources import (
     LogLine,
     Pod,
     PVC,
+    ResourceDescription,
+    ResourceEvent,
     SearchResult,
+    SecretRecord,
     Service,
     Workload,
 )
@@ -45,7 +48,10 @@ __all__ = [
     "LogLine",
     "Pod",
     "PVC",
+    "ResourceDescription",
+    "ResourceEvent",
     "SearchResult",
+    "SecretRecord",
     "Service",
     "Workload",
 ]

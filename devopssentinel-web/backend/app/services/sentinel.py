@@ -97,7 +97,9 @@ OPERATIONS: dict[str, OperationSpec] = {
     "storage.dependencies": OperationSpec(
         "storage.dependencies", "Storage", "storage", "storage", 45
     ),
-    "etdp.platform": OperationSpec("etdp.platform", "ETDP Platform", "etdp", "etdp", 60),
+    "application.profile": OperationSpec(
+        "application.profile", "Application Profile", "application", "application-profile", 60
+    ),
     "database.postgres": OperationSpec(
         "database.postgres", "PostgreSQL / Generic DB", "database", "postgres-discovery", 60
     ),

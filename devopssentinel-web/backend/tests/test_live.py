@@ -100,7 +100,7 @@ def test_validate_target_rejects_bad_input(host, port, database, username):
 
 
 def test_validate_target_accepts_a_realistic_target():
-    sqltool.validate_target("172.18.0.2", 30432, "demo", "demo")
+    sqltool.validate_target("172.18.0.2", 30432, "platform", "platform")
 
 
 def test_database_query_is_disabled_by_default(client, monkeypatch):
@@ -109,7 +109,9 @@ def test_database_query_is_disabled_by_default(client, monkeypatch):
     status = client.get("/api/v1/database/console").json()
     assert status["data"]["enabled"] is False
     assert status["status"] == "UNAVAILABLE"
-    assert "DSWEB_ENABLE_SQL_CONSOLE" in status["data"]["reason"]
+    # The feature is now switched on from the Settings page, so the reason has
+    # to point there; the environment variable is only the start-up default.
+    assert "Settings" in status["data"]["reason"]
     # The prefill host is the node a NodePort endpoint answers on, not 127.0.0.1.
     assert status["data"]["defaultHost"] == "10.0.0.7"
 
@@ -118,8 +120,8 @@ def test_database_query_is_disabled_by_default(client, monkeypatch):
         json={
             "host": "127.0.0.1",
             "port": 5432,
-            "database": "demo",
-            "username": "demo",
+            "database": "platform",
+            "username": "platform",
             "password": "x",
             "sql": "select 1",
         },
@@ -132,7 +134,7 @@ def test_kafka_topics_is_disabled_by_default(client, monkeypatch):
     _stub_node_address(monkeypatch)
     status = client.get("/api/v1/kafka/console").json()
     assert status["data"]["enabled"] is False
-    assert "DSWEB_ENABLE_KAFKA_TOPICS" in status["data"]["reason"]
+    assert "Settings" in status["data"]["reason"]
     assert status["data"]["defaultHost"] == "10.0.0.7"
 
     response = client.post(
@@ -149,6 +151,55 @@ def test_console_prefill_survives_a_cluster_without_a_node_address(client, monke
     status = client.get("/api/v1/database/console").json()
     assert status["data"]["defaultHost"] == ""
     assert status["status"] == "UNAVAILABLE"  # still only gated by the opt-in flag
+
+
+# --------------------------------------------------------------------------
+# Runtime toggles (services/liveconfig.py)
+# --------------------------------------------------------------------------
+
+def test_env_flag_is_the_startup_default(state_dir, monkeypatch):
+    """DSWEB_ENABLE_SQL_CONSOLE=1 still turns the console on at start-up."""
+    from app.config import settings
+    from app.services import liveconfig
+
+    monkeypatch.setattr(settings, "enable_sql_console", True)
+    assert liveconfig.sql_console_enabled() is True
+
+
+def test_settings_toggle_overrides_the_env_default(state_dir, monkeypatch):
+    """A choice made in Settings must win over the start-up environment."""
+    from app.config import settings
+    from app.services import liveconfig
+
+    monkeypatch.setattr(settings, "enable_sql_console", True)
+    monkeypatch.setattr(settings, "enable_kafka_topics", True)
+
+    flags = liveconfig.set_flags(sql_console=False)
+    assert flags == {"sqlConsole": False, "kafkaTopics": True}
+    assert liveconfig.sql_console_enabled() is False
+    # Untouched flags keep following the environment.
+    assert liveconfig.kafka_topics_enabled() is True
+
+
+def test_set_flags_is_private_and_persisted(state_dir):
+    from app.services import liveconfig
+
+    liveconfig.set_flags(kafka_topics=True)
+    stored = state_dir / "live.json"
+    assert stored.is_file()
+    assert liveconfig.kafka_topics_enabled() is True
+    # 0o600 where the platform honours it; the write must not raise regardless.
+    assert liveconfig.snapshot() == {"sqlConsole": False, "kafkaTopics": True}
+
+
+def test_corrupt_flag_file_falls_back_to_the_environment(state_dir, monkeypatch):
+    """A half-written file must never take the server down."""
+    from app.config import settings
+    from app.services import liveconfig
+
+    monkeypatch.setattr(settings, "enable_sql_console", True)
+    (state_dir / "live.json").write_text("{ not json", encoding="utf-8")
+    assert liveconfig.sql_console_enabled() is True
 
 
 # --------------------------------------------------------------------------

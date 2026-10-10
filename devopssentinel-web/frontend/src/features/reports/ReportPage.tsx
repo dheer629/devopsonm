@@ -1,18 +1,18 @@
 import { useMemo } from "react";
 
-import { useDoctor, useEtDp } from "@/api/queries";
+import { useApplicationProfile, useDoctor } from "@/api/queries";
 import { ErrorState, Freshness, LoadingRows, PageHeader, RawView } from "@/components/common";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { reportText } from "@/lib/format";
 import { useApp } from "@/state/AppContext";
 
-export type ReportKind = "etdp" | "health";
+export type ReportKind = "application" | "health";
 
 const META: Record<ReportKind, { title: string; subtitle: string }> = {
-  etdp: {
-    title: "ETDP Platform",
-    subtitle: "Recognisable platform workloads grouped from engine evidence.",
+  application: {
+    title: "Application Profile",
+    subtitle: "Discoverable platform workloads grouped from engine evidence.",
   },
   health: {
     title: "Smart Health",
@@ -22,10 +22,10 @@ const META: Record<ReportKind, { title: string; subtitle: string }> = {
 
 export function ReportPage({ kind }: { kind: ReportKind }) {
   const { scope } = useApp();
-  const etdp = useEtDp(scope, kind === "etdp");
+  const application = useApplicationProfile(scope, kind === "application");
   const health = useDoctor(scope, kind === "health");
 
-  const active = kind === "etdp" ? etdp : health;
+  const active = kind === "application" ? application : health;
   const meta = META[kind];
 
   const lines = useMemo(

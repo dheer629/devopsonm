@@ -2,16 +2,16 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: sentinel-demo
+  name: sentinel-platform
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: sentinel-demo
+      app: sentinel-platform
   template:
     metadata:
       labels:
-        app: sentinel-demo
+        app: sentinel-platform
     spec:
       automountServiceAccountToken: false
       securityContext:
@@ -54,10 +54,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: sentinel-demo
+  name: sentinel-platform
 spec:
   selector:
-    app: sentinel-demo
+    app: sentinel-platform
   ports:
     - name: redis
       port: 6379

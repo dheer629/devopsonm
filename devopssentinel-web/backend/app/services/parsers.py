@@ -31,6 +31,7 @@ from ..models.resources import (
     LogLine,
     Pod,
     PVC,
+    SecretRecord,
     Service,
     Workload,
 )
@@ -323,7 +324,7 @@ _CATEGORY_DOMAIN = {
     "KAFKA": "Kafka",
     "POSTGRES": "Database",
     "DATABASE": "Database",
-    "ETDP": "ETDP",
+    "APPLICATION": "Application",
 }
 
 _SEV_TOKEN = re.compile(r"\b(FAIL|FAILED|CRITICAL|WARN|WARNING|NOTICE|INFO|OK|UNKNOWN)\b")
@@ -370,9 +371,20 @@ def normalize_findings(lines: list[str], namespace: str = "") -> list[Finding]:
         return findings
 
     # Fallback for report modes that embed severity-prefixed lines.
+    #
+    # A severity token inside a *counter* (`FAIL=0 WARN=0`) or a *legend*
+    # (`0=no FAIL 1=observed FAIL`) is describing the report, not reporting a
+    # problem. Accepting those made the findings queue show three rows when the
+    # engine had reported `FAIL=0` -- nothing wrong at all (spec sections 44, 286).
+    counter_line = re.compile(r"\b(?:FAIL|WARN|WARNING|UNKNOWN|INFO|OK)\s*=\s*\d+", re.I)
+    legend_line = re.compile(r"\b\d+\s*=\s*[A-Za-z]")
+    meta_line = re.compile(r"full detail:|data gaps|coverage table", re.I)
+
     for raw in lines:
         line = re.sub(r"^[\s\-*|>]+", "", raw).strip()
         if len(line) < 8:
+            continue
+        if counter_line.search(line) or legend_line.search(line) or meta_line.search(line):
             continue
         match = _SEV_TOKEN.search(line.upper())
         if not match:
@@ -438,6 +450,39 @@ def normalize_events(lines: list[str], namespace: str = "") -> list[Event]:
                     message=(message.strip() or issue)[:400],
                 )
             )
+    return events
+
+
+def normalize_live_events(rows: list[dict], namespace: str = "") -> list[Event]:
+    """``kubectl get events -o json`` rows -> ``Event`` models.
+
+    The engine's triage report and this live path must agree on severity, so a
+    Warning is WARNING, a Normal is INFO, and anything else stays UNKNOWN
+    rather than being silently upgraded.
+    """
+    events: list[Event] = []
+    for row in rows:
+        kind = str(row.get("type", ""))
+        if kind == "Warning":
+            severity = "WARNING"
+        elif kind == "Normal":
+            severity = "INFO"
+        else:
+            severity = "UNKNOWN"
+        try:
+            count = int(row.get("count", 1) or 1)
+        except (TypeError, ValueError):
+            count = 1
+        events.append(
+            Event(
+                time=str(row.get("time", ""))[:32],
+                severity=severity,
+                reason=str(row.get("reason", ""))[:120],
+                object=str(row.get("object", ""))[:200] or namespace,
+                count=count,
+                message=str(row.get("message", ""))[:400],
+            )
+        )
     return events
 
 
@@ -599,6 +644,7 @@ def normalize_services(lines: list[str], namespace: str = "") -> list[Service]:
 _CERT_BLOCK = re.compile(r"^\[([A-Z_]+)\]\s+(\S+)\s+\|\s+namespace=(\S+)\s+\|")
 _CERT_DAYS = re.compile(r"\bdaysLeft=(-?\d+)")
 _CERT_CN = re.compile(r"CN\s*=\s*([^,]+)")
+_CERT_SOURCE = re.compile(r"\bsource=([^|]+)")
 
 
 def _cert_status(days: int | None, fallback: str = "") -> str:
@@ -620,17 +666,19 @@ def normalize_certificates(lines: list[str], namespace: str = "") -> list[Certif
     certs: list[Certificate] = []
 
     # Primary format: the engine's `TLS CERTIFICATE METADATA` block, e.g.
-    #   [OK] demo-tls | namespace=default | source=Secret/tls.crt certificate#1 | daysLeft=364
-    #   subject=CN = demo.sentinel.local, O = DevOpsSentinel Demo
-    #   issuer=CN = demo.sentinel.local, O = DevOpsSentinel Demo
+    #   [OK] platform-tls | namespace=default | source=Secret/tls.crt certificate#1 | daysLeft=364
+    #   subject=CN = sentinel.internal, O = DevOpsSentinel Platform
+    #   issuer=CN = sentinel.internal, O = DevOpsSentinel Platform
     #   notAfter=Oct  4 03:32:57 2027 GMT
     current: Certificate | None = None
+    pending_san = False
 
     def flush() -> None:
-        nonlocal current
+        nonlocal current, pending_san
         if current is not None:
             certs.append(current)
             current = None
+        pending_san = False
 
     for raw in lines:
         stripped = raw.strip()
@@ -640,14 +688,21 @@ def normalize_certificates(lines: list[str], namespace: str = "") -> list[Certif
             state, name, ns = block.groups()
             days_match = _CERT_DAYS.search(stripped)
             days = int(days_match.group(1)) if days_match else None
+            source_match = _CERT_SOURCE.search(stripped)
             current = Certificate(
                 name=name,
                 namespace=ns or namespace,
                 days=days,
                 status=_cert_status(days, state),
+                source=source_match.group(1).strip() if source_match else "",
             )
             continue
         if current is None:
+            continue
+        if pending_san:
+            if stripped:
+                current.san = stripped
+                pending_san = False
             continue
         if stripped.startswith("subject="):
             current.cn = _cert_field(stripped[len("subject="):])
@@ -655,18 +710,42 @@ def normalize_certificates(lines: list[str], namespace: str = "") -> list[Certif
             current.issuer = _cert_field(stripped[len("issuer="):])
         elif stripped.startswith("notAfter="):
             current.expiry = stripped[len("notAfter="):].strip()
+        elif stripped.startswith("notBefore="):
+            current.not_before = stripped[len("notBefore="):].strip()
+        elif stripped.startswith("serial="):
+            current.serial = stripped[len("serial="):].strip()
+        elif stripped.lower().startswith("sha256 fingerprint="):
+            current.fingerprint = stripped.split("=", 1)[1].strip()
+        elif stripped.startswith("X509v3 Subject Alternative Name:"):
+            value = stripped[len("X509v3 Subject Alternative Name:"):].strip()
+            if value:
+                current.san = value
+            else:
+                pending_san = True
     flush()
 
     # Fallback: tab-separated certificate tables (other engine revisions).
+    #
+    # The `--cert-expiry` audit uses NAMESPACE/OBJECT/CN-SAN/ISSUER/EXPIRY/DAYS/
+    # STATUS, where OBJECT is a `Kind/name` reference. Recognising those aliases
+    # keeps the GUI's expiry posture sourced from the engine's own thresholds
+    # rather than a browser-side recomputation (spec sections 66, 286, 290).
     for header, rows in extract_tables(lines):
         low = [h.lower() for h in header]
-        if not any(h in low for h in ("certificate", "cn", "expiry", "days", "issuer", "not after")):
+        if not any(
+            h in low
+            for h in ("certificate", "cn", "cn/san", "object", "expiry", "days", "issuer", "not after")
+        ):
             continue
-        if "name" not in low and "cn" not in low:
+        if not any(h in low for h in ("name", "cn", "cn/san", "object")):
             continue
         for row in rows:
-            name = _cell(row, header, "name", "certificate", "secret")
-            cn = _cell(row, header, "cn", "common name", "subject")
+            name = _cell(row, header, "name", "certificate", "secret", "object")
+            if "/" in name:
+                # `Secret/syslog-cert` -> `syslog-cert`, keeping the row usable as
+                # an identifier the dependency routes also accept.
+                name = name.split("/", 1)[1]
+            cn = _cell(row, header, "cn", "cn/san", "common name", "subject")
             if not name and not cn:
                 continue
             days_raw = _cell(row, header, "days", "remaining", "expires in")
@@ -714,6 +793,57 @@ def normalize_certificates(lines: list[str], namespace: str = "") -> list[Certif
     return certs
 
 
+def normalize_secrets(lines: list[str], namespace: str = "") -> list[SecretRecord]:
+    """Parse the engine's ``SECRET METADATA`` table into typed rows.
+
+    The engine lists NAME / TYPE / CREATED / KEY COUNT / KEY NAMES for every
+    Secret in scope. For ``kubernetes.io/tls`` Secrets we join the certificate
+    expiry reported by the ``TLS CERTIFICATE METADATA`` block, so the PKI view
+    can show *secret expiry* next to *secret inventory* without ever requesting
+    Secret data values.
+    """
+    cert_expiry: dict[str, tuple[str, int | None]] = {
+        cert.name: (cert.expiry, cert.days)
+        for cert in normalize_certificates(lines, namespace)
+    }
+
+    records: list[SecretRecord] = []
+    for header, rows in extract_tables(lines):
+        low = [h.lower() for h in header]
+        if "name" not in low or "type" not in low:
+            continue
+        if not any(h in low for h in ("created", "key count", "key names")):
+            continue
+        for row in rows:
+            name = _cell(row, header, "name")
+            if not name:
+                continue
+            secret_type = _cell(row, header, "type")
+            is_tls = "kubernetes.io/tls" in secret_type
+            try:
+                key_count = int(re.sub(r"[^0-9]", "", _cell(row, header, "key count")) or 0)
+            except ValueError:
+                key_count = 0
+            expires, days = cert_expiry.get(name, ("", None))
+            if not is_tls:
+                days = None
+            records.append(
+                SecretRecord(
+                    name=name,
+                    namespace=namespace,
+                    type=secret_type,
+                    created=_cell(row, header, "created"),
+                    key_count=key_count,
+                    keys=_cell(row, header, "key names"),
+                    is_tls=is_tls,
+                    expires=expires,
+                    days=days,
+                    status=_cert_status(days) if is_tls and days is not None else "INFO",
+                )
+            )
+    return records
+
+
 _PVC_TREE = re.compile(r"^PVC/(\S+)\s+phase=(\S+)\s+requested=(\S+)\s+capacity=(\S+)")
 _PVC_PV = re.compile(r"\bPV:\s*(\S+)\s+class=(\S+)")
 _PVC_POD = re.compile(r"\bPod:\s*(\S+)\s+node=")
@@ -723,9 +853,9 @@ def normalize_pvcs(lines: list[str], namespace: str = "") -> list[PVC]:
     pvcs: list[PVC] = []
 
     # Primary format: the engine's `STORAGE DEPENDENCY GRAPH` tree, e.g.
-    #   PVC/demo-data phase=Bound requested=1Gi capacity=1Gi
+    #   PVC/platform-data phase=Bound requested=1Gi capacity=1Gi
     #   ├── PV: pvc-0f1d... class=local-path reclaim=Delete csi=UNKNOWN
-    #   └── Pod: demo-web-7cf4... node=dev
+    #   └── Pod: platform-web-7cf4... node=dev
     current: PVC | None = None
 
     def flush() -> None:
@@ -878,9 +1008,30 @@ def normalize_kafka_services(lines: list[str], namespace: str = "") -> list[Kafk
 
 _ARROW = re.compile(r"([A-Za-z][A-Za-z0-9]*)/(\S+)\s*->\s*([A-Za-z][A-Za-z0-9]*)/(\S+?)(?:\s|$)")
 
+# The engine also reports relationships as a tree, e.g. the GitOps graph:
+#
+#   GitRepository/devopsonm revision=main@sha1:f740...
+#   ├── Kustomization/devopsonm ready=True applied=main@sha1:f740...
+#
+# Reading only `->` edges made that report parse to zero edges, so the console
+# showed "no chain reported" while the engine had reported one. Tree lines are
+# therefore parsed too, keyed by their indent depth so nesting is preserved.
+_TREE_ITEM = re.compile(r"([A-Z][A-Za-z0-9]*)/(\S+)")
+_TREE_GLYPHS = "│├└─┌┐┘┬┴┼ "
+
+
+def _tree_depth(line: str) -> int:
+    return len(line) - len(line.lstrip(_TREE_GLYPHS))
+
 
 def normalize_dependency_graph(lines: list[str]) -> Graph:
-    """Parse `Kind/a -> Kind/b` chains (dependency and GitOps comparison lines)."""
+    """Parse the engine's dependency reports into a typed graph.
+
+    Handles both formats the engine emits:
+
+    * arrow chains — ``Kind/a -> Kind/b``
+    * trees — ``Kind/a`` followed by ``├── Kind/b`` children
+    """
     nodes: dict[str, GraphNode] = {}
     edges: list[GraphEdge] = []
 
@@ -892,7 +1043,12 @@ def normalize_dependency_graph(lines: list[str]) -> Graph:
         )
         return node_id
 
+    # (depth, node_id) for the tree walk; the last entry at a lower depth is the
+    # parent of the current line.
+    stack: list[tuple[int, str]] = []
+
     for raw in lines:
+        statement = raw.strip()[:300]
         for match in _ARROW.finditer(raw):
             src = add_node(match.group(1), match.group(2).rstrip(":"))
             dst = add_node(match.group(3), match.group(4).rstrip(":"))
@@ -903,8 +1059,38 @@ def normalize_dependency_graph(lines: list[str]) -> Graph:
                     target=dst,
                     label=_edge_label(src, dst),
                     confidence="HIGH CONFIDENCE",
+                    evidence=statement,
                 )
             )
+
+        # Tree form. The prefix is stripped first so prose such as
+        # `Confidence: CONFIRMED where Flux sourceRef/status.inventory ...`
+        # cannot be mistaken for a `Kind/name` reference.
+        remainder = raw.lstrip(_TREE_GLYPHS).rstrip()
+        item = _TREE_ITEM.match(remainder)
+        if not item:
+            continue
+        depth = _tree_depth(raw)
+        node_id = add_node(item.group(1), item.group(2).rstrip(":,"))
+
+        while stack and stack[-1][0] >= depth:
+            stack.pop()
+        if stack:
+            parent = stack[-1][1]
+            edge_id = f"{parent}->{node_id}"
+            if not any(edge.id == edge_id for edge in edges):
+                edges.append(
+                    GraphEdge(
+                        id=edge_id,
+                        source=parent,
+                        target=node_id,
+                        label=_edge_label(parent, node_id),
+                        confidence="HIGH CONFIDENCE",
+                        evidence=statement,
+                    )
+                )
+        stack.append((depth, node_id))
+
     return Graph(nodes=list(nodes.values()), edges=edges)
 
 
@@ -937,30 +1123,82 @@ def _edge_label(src: str, dst: str) -> str:
     return "DEPENDS_ON"
 
 
-def normalize_logs(
-    lines: list[str], pod: str, container: str = "", previous: bool = False
-) -> LogBundle:
-    out: list[LogLine] = []
+# A `kubectl logs --timestamps=true` line begins with an RFC3339 stamp; the
+# viewer shows it in its own column instead of inside the message.
+_LOG_TS = re.compile(
+    r"^(\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:?\d{2}))\s+(.*)$"
+)
+
+
+def _log_level(text: str) -> str:
+    low = (text or "").lower()
+    if "error" in low or "fatal" in low or "panic" in low:
+        return "ERROR"
+    if "warn" in low:
+        return "WARN"
+    if "debug" in low or "trace" in low:
+        return "DEBUG"
+    return "INFO"
+
+
+def _log_patterns(entries: list[tuple[str, str]]) -> list[dict[str, object]]:
     counts: dict[str, int] = {}
-    for index, raw in enumerate(lines, start=1):
-        low = raw.lower()
-        level = "INFO"
-        if "error" in low or "fatal" in low or "panic" in low:
-            level = "ERROR"
-        elif "warn" in low:
-            level = "WARN"
-        elif "debug" in low or "trace" in low:
-            level = "DEBUG"
-        out.append(LogLine(n=index, text=raw, level=level))
-        normalized = re.sub(r"\d+", "#", raw.strip())[:120]
+    for _ts, text in entries:
+        normalized = re.sub(r"\d+", "#", text.strip())[:120]
         if normalized:
             counts[normalized] = counts.get(normalized, 0) + 1
-    patterns = [
+    return [
         {"pattern": key, "count": value}
         for key, value in sorted(counts.items(), key=lambda kv: -kv[1])[:10]
         if value > 1
     ]
-    return LogBundle(pod=pod, container=container, previous=previous, lines=out, patterns=patterns)
+
+
+def normalize_kube_logs(
+    lines: list[str],
+    pod: str,
+    container: str = "",
+    previous: bool = False,
+    *,
+    since: str = "",
+    tail: int = 0,
+    timestamps: bool = True,
+    containers: list[str] | None = None,
+) -> LogBundle:
+    """Parse a real `kubectl logs` capture, keeping any leading timestamp."""
+    out: list[LogLine] = []
+    entries: list[tuple[str, str]] = []
+    for index, raw in enumerate(lines, start=1):
+        ts = ""
+        text = raw
+        if timestamps:
+            match = _LOG_TS.match(raw)
+            if match:
+                ts, text = match.group(1), match.group(2)
+        out.append(LogLine(n=index, text=text, level=_log_level(text), ts=ts))
+        entries.append((ts, text))
+    return LogBundle(
+        pod=pod,
+        container=container,
+        previous=previous,
+        lines=out,
+        patterns=_log_patterns(entries),
+        since=since,
+        tail=tail,
+        timestamps=timestamps,
+        containers=containers or [],
+    )
+
+
+def normalize_logs(
+    lines: list[str], pod: str, container: str = "", previous: bool = False
+) -> LogBundle:
+    """Back-compat wrapper for the engine-derived `/pods/{name}/logs` view.
+
+    The engine's triage lines are not timestamp-prefixed, so timestamp parsing
+    stays off and the behaviour is byte-identical to the previous implementation.
+    """
+    return normalize_kube_logs(lines, pod, container, previous, timestamps=False)
 
 
 

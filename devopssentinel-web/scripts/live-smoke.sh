@@ -4,7 +4,7 @@
 # Proves the opt-in live path against a real PostgreSQL and a real Kafka broker,
 # and prints exactly what was written and what the API read back:
 #
-#   1. apply + seed the demo fixtures (idempotent)  -> what is INSERTED
+#   1. apply + seed the platform fixtures (idempotent)  -> what is INSERTED
 #   2. insert a marker batch                        -> a known write to look for
 #   3. read it back through POST /api/v1/database/query   -> what is COMING
 #   4. create a topic, produce and consume records  -> broker round trip
@@ -15,13 +15,13 @@
 #
 # Defaults: NAMESPACE=default, API_BASE=http://127.0.0.1:8765
 #
-# Requires: kubectl (a context with the demo fixtures), curl, python3.
+# Requires: kubectl (a context with the platform fixtures), curl, python3.
 #
 # Read-only note: the *application* only ever issues read-only statements and a
 # single Kafka Metadata request. This script is dev tooling and is the only
-# place that writes to the demo database and broker.
+# place that writes to the platform database and broker.
 #
-# The bundled demo endpoints are NodePorts, so they answer on a *node* address
+# The bundled platform endpoints are NodePorts, so they answer on a *node* address
 # -- never on 127.0.0.1. The script discovers the node InternalIP and the actual
 # nodePort values instead of assuming them.
 set -uo pipefail
@@ -43,15 +43,15 @@ NODE_IP=$(kubectl get nodes \
 [[ -n "$NODE_IP" ]] || die "no node InternalIP -- is the context reachable?"
 printf 'node address: %s\n' "$NODE_IP"
 
-log "apply + seed the demo fixtures (this is what gets INSERTED)"
-bash "$SCRIPT_DIR/demo-resources.sh" up "$NS" 2>&1 | sed -n '1,40p'
+log "apply + seed the platform fixtures (this is what gets INSERTED)"
+bash "$SCRIPT_DIR/platform-resources.sh" up "$NS" 2>&1 | sed -n '1,40p'
 
-PG_POD=$(kubectl -n "$NS" get pods -l app=demo-postgres \
+PG_POD=$(kubectl -n "$NS" get pods -l app=platform-postgres \
     -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
-KAFKA_POD=$(kubectl -n "$NS" get pods -l app=demo-kafka \
+KAFKA_POD=$(kubectl -n "$NS" get pods -l app=platform-kafka \
     -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
-[[ -n "$PG_POD" ]] || die "no demo-postgres pod in namespace $NS"
-[[ -n "$KAFKA_POD" ]] || die "no demo-kafka pod in namespace $NS"
+[[ -n "$PG_POD" ]] || die "no platform-postgres pod in namespace $NS"
+[[ -n "$KAFKA_POD" ]] || die "no platform-kafka pod in namespace $NS"
 printf 'postgres pod: %s\nkafka pod:    %s\n' "$PG_POD" "$KAFKA_POD"
 
 PG_NODE_PORT=$(kubectl -n "$NS" get svc postgres-nodeport -o jsonpath='{.spec.ports[0].nodePort}' 2>/dev/null || true)
@@ -61,14 +61,14 @@ KAFKA_NODE_PORT=$(kubectl -n "$NS" get svc kafka-nodeport -o jsonpath='{.spec.po
 printf 'postgres endpoint: %s:%s\nkafka endpoint:    %s:%s\n' \
     "$NODE_IP" "$PG_NODE_PORT" "$NODE_IP" "$KAFKA_NODE_PORT"
 
-log "insert a marker batch into public.demo_orders"
+log "insert a marker batch into public.platform_orders"
 kubectl -n "$NS" exec -i "$PG_POD" -- \
-    psql -U demo -d demo -v ON_ERROR_STOP=1 -q <<SQL
-insert into public.demo_orders (customer_id, sku, quantity, amount, status)
+    psql -U platform -d platform -v ON_ERROR_STOP=1 -q <<SQL
+insert into public.platform_orders (customer_id, sku, quantity, amount, status)
 select 1 + (g % 10), 'SKU-$MARKER-01', 1 + (g % 3), (10 + g)::numeric(10,2), 'pending'
 from generate_series(1, 7) as g;
 select 'inserted' as step, count(*) as marker_rows
-from public.demo_orders where sku = 'SKU-$MARKER-01';
+from public.platform_orders where sku = 'SKU-$MARKER-01';
 SQL
 
 log "create topic $MARKER and produce 5 records"
@@ -129,22 +129,22 @@ for path in ("/database/console", "/kafka/console"):
 TARGET = {
     "host": node_ip,
     "port": int(pg_port),
-    "database": "demo",
-    "username": "demo",
-    "password": "demo-not-a-real-credential",
+    "database": "platform",
+    "username": "platform",
+    "password": "platform-not-a-real-credential",
 }
 
 print("\n-- PostgreSQL: what the API reads back --")
 queries = [
     ("tables", "select table_name from information_schema.tables "
                "where table_schema = 'public' order by 1"),
-    ("row counts", "select 'demo_customers' as t, count(*) from public.demo_customers "
-                   "union all select 'demo_orders', count(*) from public.demo_orders "
-                   "union all select 'demo_events', count(*) from public.demo_events"),
+    ("row counts", "select 'platform_customers' as t, count(*) from public.platform_customers "
+                   "union all select 'platform_orders', count(*) from public.platform_orders "
+                   "union all select 'platform_events', count(*) from public.platform_events"),
     ("marker rows", f"select sku, count(*) as n, sum(amount)::numeric(10,2) as total "
-                    f"from public.demo_orders where sku = 'SKU-{marker}-01' group by sku"),
+                    f"from public.platform_orders where sku = 'SKU-{marker}-01' group by sku"),
     ("orders by status", "select status, count(*) as n, sum(amount)::numeric(10,2) as total "
-                         "from public.demo_orders group by status order by n desc"),
+                         "from public.platform_orders group by status order by n desc"),
 ]
 for label, sql in queries:
     status, body = post("/database/query", {**TARGET, "sql": sql})
@@ -158,9 +158,9 @@ for label, sql in queries:
 
 print("\n-- PostgreSQL: the write path is still blocked --")
 for sql in (
-    "drop table public.demo_orders",
-    "update public.demo_orders set amount = 0",
-    "select 1; delete from public.demo_orders",
+    "drop table public.platform_orders",
+    "update public.platform_orders set amount = 0",
+    "select 1; delete from public.platform_orders",
 ):
     status, body = post("/database/query", {**TARGET, "sql": sql})
     detail = str(body.get("detail", ""))

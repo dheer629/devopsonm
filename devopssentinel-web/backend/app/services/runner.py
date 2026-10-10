@@ -11,6 +11,7 @@ Guarantees (spec sections 6, 62, 81):
 from __future__ import annotations
 
 import asyncio
+import os
 import shlex
 import time
 from dataclasses import dataclass, field
@@ -19,6 +20,7 @@ from typing import Sequence
 
 from ..config import settings
 from ..security import assert_read_only, redact_text
+from . import connections
 
 
 @dataclass
@@ -118,6 +120,9 @@ class Runner:
                 *argv,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE,
+                # The engine honours KUBECONFIG, so pointing it at the active
+                # connection is what makes every report work in a container.
+                env={**os.environ, **connections.active_environment()},
             )
             stdout_b, stderr_b = await asyncio.wait_for(proc.communicate(), timeout=timeout)
         except asyncio.TimeoutError:

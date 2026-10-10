@@ -599,7 +599,7 @@ sections 2–9, in both human and machine (`--json`) form.
 SENT='DevOps_K8s_Sentinel_FINAL_GP.sh'
 bash "$SENT" --context vcluster-docker_dev --namespace devopssentinel-e2e --resources --no-color > /tmp/sntl_out.txt 2>&1
 printf 'ANSI escapes: ';            grep -c $'\033' /tmp/sntl_out.txt
-printf 'secret canary present: ';   grep -c 'DS_E2E_SECRET_CANARY_d883e5' /tmp/sntl_out.txt
+printf 'secret canary present: ';   grep -c 'DS_E2E_SECRET_CANARY_<redacted>' /tmp/sntl_out.txt
 printf 'private key marker present: '; grep -c 'BEGIN .*PRIVATE KEY' /tmp/sntl_out.txt
 
 # private-key material scan on the certificate report

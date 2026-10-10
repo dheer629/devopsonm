@@ -97,6 +97,17 @@ class Harness:
                              str(ROOT/'DevOps_K8s_Sentinel_FINAL_GP.sh'),self.context,ns or self.ns,
                              str(self.out/'runtime')],timeout=timeout,env=env)
 
+    def pty(self,args,ns=None,timeout=40,send=(),cols=120,rows=30):
+        """Run the interactive Sentinel under a real pseudo-terminal; return the raw
+        terminal byte stream so tests can assert on rendering and terminal restore."""
+        argv=['python3',str(ROOT/'devopssentinel-e2e/ptyrun.py'),'--cols',str(cols),
+              '--rows',str(rows),'--timeout',str(timeout)]
+        for step in send:
+            argv+=['--send',step]
+        argv+=['--','bash',str(ROOT/'DevOps_K8s_Sentinel_FINAL_GP.sh'),
+               '--context',self.context,'--namespace',ns or self.ns,*args]
+        return self.command(argv,timeout=timeout+40)
+
     def wait(self,resource,name,predicate,ns=None,timeout=120):
         deadline=time.monotonic()+timeout; last={}
         while time.monotonic()<deadline:
@@ -316,7 +327,7 @@ def main():
     if args.cleanup_only: h.cleanup(); return 0
     try:
         h.setup()
-        for module in ['workloads','pki','gitops','database','experience']:
+        for module in ['workloads','pki','gitops','database','experience','production']:
             if args.domain and module not in args.domain and not (module=='pki' and 'certificates' in args.domain) and not (module=='workloads' and any(d in args.domain for d in ['networking','storage','dependencies'])): continue
             try: importlib.import_module(module).run(h)
             except Exception as exc:

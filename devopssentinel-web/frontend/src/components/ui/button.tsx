@@ -12,10 +12,11 @@ const buttonVariants = cva(
         default:
           "border border-border bg-panel-2 text-text hover:border-border-strong hover:bg-panel",
         primary:
-          "border border-transparent bg-accent text-white shadow-[0_2px_10px_var(--accent-soft)] hover:brightness-110",
+          "border border-transparent bg-accent text-accent-ink shadow-[0_2px_10px_var(--accent-soft)] hover:brightness-110",
         ghost: "border border-transparent text-text-muted hover:bg-panel-2 hover:text-text",
         outline: "border border-border-strong text-text hover:bg-panel-2",
         danger: "border border-critical/45 text-critical hover:bg-critical/10",
+        success: "border border-success/45 bg-success/10 text-success hover:bg-success/20",
         soft: "border border-transparent bg-accent-soft text-accent hover:brightness-110",
       },
       size: {

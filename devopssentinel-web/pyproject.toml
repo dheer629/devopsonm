@@ -1,7 +1,7 @@
 [project]
 name = "devopssentinel-web"
 version = "1.0.0"
-description = "Local read-only Kubernetes / GitOps / PKI / ETDP operations control center (browser edition of DevOpsSentinel)"
+description = "Local read-only Kubernetes / GitOps / PKI / application profile operations control center (browser edition of DevOpsSentinel)"
 requires-python = ">=3.11"
 
 [tool.pytest.ini_options]

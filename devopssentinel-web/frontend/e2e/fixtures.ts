@@ -126,6 +126,11 @@ export const CERTIFICATES = [
     status: "WARNING",
     consumers: 3,
     gitops: "",
+    serial: "ABCDEF0123456789",
+    fingerprint: "AA:BB:CC:DD",
+    not_before: "2026-01-01",
+    san: "DNS:syslog.local",
+    source: "Secret/tls.crt certificate#1",
   },
   {
     name: "transformer-tls",
@@ -137,6 +142,50 @@ export const CERTIFICATES = [
     status: "OK",
     consumers: 1,
     gitops: "",
+    serial: "0011223344556677",
+    fingerprint: "11:22:33:44",
+    not_before: "2026-01-01",
+    san: "DNS:transformer.svc",
+    source: "Secret/tls.crt certificate#1",
+  },
+];
+
+export const SECRETS = [
+  {
+    name: "syslog-cert",
+    namespace: "devopsonm",
+    type: "kubernetes.io/tls",
+    created: "2026-01-01T00:00:00Z",
+    key_count: 2,
+    keys: "tls.crt tls.key",
+    is_tls: true,
+    expires: "2026-11-01",
+    days: 29,
+    status: "WARNING",
+  },
+  {
+    name: "transformer-tls",
+    namespace: "devopsonm",
+    type: "kubernetes.io/tls",
+    created: "2026-01-01T00:00:00Z",
+    key_count: 2,
+    keys: "tls.crt tls.key",
+    is_tls: true,
+    expires: "2027-06-01",
+    days: 240,
+    status: "OK",
+  },
+  {
+    name: "transformer-db",
+    namespace: "devopsonm",
+    type: "Opaque",
+    created: "2026-01-01T00:00:00Z",
+    key_count: 1,
+    keys: "dsn",
+    is_tls: false,
+    expires: "",
+    days: null,
+    status: "INFO",
   },
 ];
 
@@ -256,6 +305,50 @@ export const KAFKA_SERVICES = [
   },
 ];
 
+/** `/connections` — the Settings page reads `active` and `health` from here. */
+export const CONNECTIONS = {
+  files: [{ source: "host-kube", path: "/host-kube/config", bytes: 4187 }],
+  candidates: [],
+  active: {
+    candidateId: "vcluster-docker_dev",
+    kubeconfig: "/host-kube/config",
+    context: "vcluster-docker_dev",
+    namespace: "devopsonm",
+    serverOverride: "https://host.docker.internal:11259",
+    insecureSkipTlsVerify: true,
+    environment: "vcluster",
+    label: "vcluster-docker_dev",
+    server: "https://127.0.0.1:11259",
+    effectiveKubeconfig: "/state/kubeconfig",
+    updatedAt: 1_760_000_000_000,
+  },
+  health: {
+    configured: true,
+    reachable: true,
+    reason: "",
+    detail: "",
+    server: "https://host.docker.internal:11259",
+    serverVersion: "v1.30.4",
+    context: "vcluster-docker_dev",
+    environment: "vcluster",
+  },
+  kubectlAvailable: true,
+  effectiveKubeconfig: "/state/kubeconfig",
+  stateDir: "/state",
+  live: { sqlConsole: false, kafkaTopics: false },
+};
+
+/** `/storage/mount-warnings` — nothing mounted twice, nothing left unconsumed. */
+export const MOUNT_WARNINGS = { warnings: [], unconsumed: [] };
+
+/** The index the server-side search answers from (`/search?q=`). */
+export const SEARCH_INDEX = [
+  { kind: "Pod", name: "transformer-abc", namespace: "devopsonm", route: "/workloads", state: "OK" },
+  { kind: "Service", name: "transformer", namespace: "devopsonm", route: "/network", state: "OK" },
+  { kind: "Certificate", name: "transformer-tls", namespace: "devopsonm", route: "/pki", state: "OK" },
+  { kind: "PVC", name: "data-1", namespace: "devopsonm", route: "/storage", state: "WARNING" },
+];
+
 export const NODE_USAGE = [
   {
     name: "minikube",
@@ -344,6 +437,19 @@ export async function installFixtures(page: Page): Promise<void> {
     if (path.endsWith("/certificates")) {
       return json({ envelope: envelope(CERTIFICATES), raw: rawEvidence() });
     }
+    if (path.endsWith("/secrets")) {
+      return json({ envelope: envelope(SECRETS), raw: rawEvidence() });
+    }
+    // The PKI page reads three deeper certificate views on load (spec 34-43).
+    if (path.endsWith("/certificates/expiry")) {
+      return json({ envelope: envelope(CERTIFICATES), raw: rawEvidence() });
+    }
+    if (path.endsWith("/certificates/duplicates")) {
+      return json({ envelope: envelope({}), raw: rawEvidence() });
+    }
+    if (path.endsWith("/certificates/issuers")) {
+      return json({ envelope: envelope(["internal-ca"]), raw: rawEvidence() });
+    }
     if (path.endsWith("/gitops")) return json({ envelope: envelope(GITOPS), raw: rawEvidence() });
     if (path.endsWith("/network/services")) {
       return json({ envelope: envelope(SERVICES), raw: rawEvidence() });
@@ -352,6 +458,12 @@ export async function installFixtures(page: Page): Promise<void> {
       return json({ envelope: envelope([SERVICES[1]]), raw: rawEvidence() });
     }
     if (path.endsWith("/storage")) return json({ envelope: envelope(PVCS), raw: rawEvidence() });
+    if (path.endsWith("/storage/mount-warnings")) {
+      return json({ envelope: envelope(MOUNT_WARNINGS), raw: rawEvidence() });
+    }
+    if (path.endsWith("/network/endpoints")) {
+      return json({ envelope: envelope(SERVICES), raw: rawEvidence() });
+    }
     // Graph routes must be matched before the generic "/gitops" rule.
     if (path.endsWith("/graph/gitops")) {
       return json({ envelope: envelope(GRAPH), raw: rawEvidence() });
@@ -374,7 +486,7 @@ export async function installFixtures(page: Page): Promise<void> {
         raw: rawEvidence(),
       });
     }
-    if (path.endsWith("/etdp")) {
+    if (path.endsWith("/application-profile")) {
       return json({
         envelope: envelope("Log Transformer -> TLS Secret -> Service"),
         raw: rawEvidence(),
@@ -389,7 +501,8 @@ export async function installFixtures(page: Page): Promise<void> {
             maxRows: 200,
             timeoutS: 15,
             defaultHost: "10.0.0.7",
-            reason: "disabled: start the backend with DSWEB_ENABLE_SQL_CONSOLE=1",
+            reason:
+              "disabled: turn on the Read-only SQL console switch in Settings (it applies immediately, no restart needed)",
           },
           { source: "LOCAL" },
         ),
@@ -402,7 +515,8 @@ export async function installFixtures(page: Page): Promise<void> {
             enabled: false,
             timeoutS: 8,
             defaultHost: "10.0.0.7",
-            reason: "disabled: start the backend with DSWEB_ENABLE_KAFKA_TOPICS=1",
+            reason:
+              "disabled: turn on the Kafka topic listing switch in Settings (it applies immediately, no restart needed)",
           },
           { source: "LOCAL" },
         ),
@@ -468,7 +582,8 @@ export async function installFixtures(page: Page): Promise<void> {
     if (path.endsWith("/diagnostics")) {
       return json(envelope({ cache: { entries: 3, hits: 5, misses: 2 }, audit: [] }, { source: "LOCAL" }));
     }
-    if (path.includes("/logs")) {
+    // Pod-detail logs (engine-derived, PARTIAL) must win over the /logs viewer.
+    if (path.includes("/pods/") && path.endsWith("/logs")) {
       return json({
         envelope: envelope(
           {
@@ -476,12 +591,64 @@ export async function installFixtures(page: Page): Promise<void> {
             container: "",
             previous: false,
             lines: [
-              { n: 1, text: "ERROR certificate verify failed", level: "ERROR" },
-              { n: 2, text: "INFO retrying", level: "INFO" },
+              { n: 1, text: "ERROR certificate verify failed", level: "ERROR", ts: "" },
+              { n: 2, text: "INFO retrying", level: "INFO", ts: "" },
             ],
             patterns: [{ pattern: "ERROR certificate verify failed", count: 2 }],
+            since: "",
+            tail: 500,
+            timestamps: false,
+            containers: [],
           },
           { source: "PARTIAL", status: "PARTIAL", partial: true, warnings: ["CLI-only"] },
+        ),
+        raw: rawEvidence(),
+      });
+    }
+    if (path.endsWith("/logs")) {
+      return json({
+        envelope: envelope(
+          {
+            pod: "log-transformer-def",
+            container: "main",
+            previous: false,
+            lines: [
+              {
+                n: 1,
+                text: "ERROR certificate verify failed",
+                level: "ERROR",
+                ts: "2026-10-03T00:00:02Z",
+              },
+              { n: 2, text: "INFO retrying", level: "INFO", ts: "2026-10-03T00:00:03Z" },
+            ],
+            patterns: [{ pattern: "ERROR certificate verify failed", count: 2 }],
+            since: "15m",
+            tail: 500,
+            timestamps: true,
+            containers: ["main", "sidecar"],
+          },
+          { source: "LIVE", status: "OK" },
+        ),
+        raw: rawEvidence(),
+      });
+    }
+    if (path.endsWith("/containers")) {
+      return json(
+        envelope({ pod: "log-transformer-def", containers: ["main", "sidecar"] }, { source: "LIVE" }),
+      );
+    }
+    if (path.endsWith("/describe")) {
+      return json({
+        envelope: envelope(
+          {
+            kind: url.searchParams.get("kind") ?? "Pod",
+            name: url.searchParams.get("name") ?? "log-transformer-def",
+            namespace: "devopsonm",
+            format: url.searchParams.get("format") ?? "describe",
+            content: "Name: log-transformer-def\nNamespace: devopsonm\nStatus: Running",
+            events: [],
+          },
+          { source: "LIVE", status: "OK" },
         ),
         raw: rawEvidence(),
       });
@@ -492,7 +659,43 @@ export async function installFixtures(page: Page): Promise<void> {
         raw: rawEvidence(),
       });
     }
-    return json(envelope(null));
+    if (path.endsWith("/connections")) {
+      return json(envelope(CONNECTIONS, { source: "LOCAL" }));
+    }
+    if (path.endsWith("/settings/live")) {
+      return json(envelope({ sqlConsole: false, kafkaTopics: false }, { source: "LOCAL" }));
+    }
+    if (path.endsWith("/search")) {
+      // The palette asks the server; answer from the same index the pages render.
+      const q = (url.searchParams.get("q") ?? "").toLowerCase();
+      const term = q.replace(/^\w+:/, "");
+      const results = SEARCH_INDEX.filter((hit) =>
+        hit.name.toLowerCase().includes(term),
+      ).map((hit) => ({ ...hit, source: "LIVE", engine: "fixture" }));
+      return json(
+        envelope(
+          {
+            query: q,
+            terms: q ? [q] : [],
+            filters: {},
+            results,
+            total: results.length,
+            searched: ["Pod", "Service", "Certificate", "PVC"],
+            unavailable: [],
+          },
+          { source: "LIVE" },
+        ),
+      );
+    }
+    // An unmocked route is a gap in *this fixture*, not a response the real
+    // backend would ever send. Returning an empty envelope here handed pages a
+    // shape they read one level too deep, which blanked whole views behind the
+    // ErrorBoundary; a 404 names the gap in the test that hits it.
+    return route.fulfill({
+      status: 404,
+      contentType: "application/json",
+      body: JSON.stringify({ detail: `no fixture for ${path}` }),
+    });
   });
 }
 

@@ -20,13 +20,13 @@ Legend
 | `--resources` | SUPPORTED | `/workloads`, `/workloads/pods/:name` (`workloads.resources`) | Pods + workloads normalized to typed rows |
 | `--gitops` | SUPPORTED | `/gitops` (`gitops.overview`) | Split by kind (sources, Kustomizations, HelmReleases) |
 | `--gitops-graph` | SUPPORTED | `/gitops`, `/topology?graph=gitops` (`graph.gitops`) | Flux chain rendered as graph + edge list |
-| `--certificates` | SUPPORTED | `/pki` (`pki.certificates`) | Expiry posture, consumers, duplicates/issuers endpoints |
+| `--certificates` | SUPPORTED | `/pki` (`pki.certificates`, `/secrets`) | Expiry posture, consumers, duplicates/issuers endpoints; **Certificates** tab carries the real X.509 serial/SAN/source and the **Secrets** tab joins certificate expiry onto the Secret inventory (`GET /api/v1/secrets`) |
 | `--cert-expiry` | SUPPORTED | `/api/v1/certificates/expiry` (`pki.cert_expiry`) | Nearest-expiry ordering |
 | `--triage` | SUPPORTED | `/findings`, `/events` (`workloads.triage`) | Findings queue + event table/timeline |
 | `--triage-workload KIND/NAME` | SUPPORTED | `/workloads/pods/:name` (`workloads.triage_workload`) | Pod detail, containers, events, logs |
 | `--network` | SUPPORTED | `/network` (`network.topology`) | Services, endpoint gaps, port path |
 | `--storage` | SUPPORTED | `/storage` (`storage.dependencies`) | PVC centre: namespace, status, capacity, StorageClass, volume **and the consuming pod** |
-| `--etdp` | PARTIAL | `/etdp` (`etdp.platform`) | Grouping text rendered; engine emits text, not grouped JSON |
+| `--application-profile` | PARTIAL | `/application-profile` (`application.profile`) | Grouping text rendered; engine emits text, not grouped JSON |
 | `--postgres-discovery` | SUPPORTED | `/database` (`database.postgres`, `database.services`) | **Services** table (service, type, port, cluster IP, ready endpoint, status), **Data** view joining each database to its backing pod + PVCs, **Report**/**Raw**. Row-level SQL stays CLI ONLY |
 | `--kafka-discovery` | SUPPORTED | `/kafka` (`kafka.discovery`, `kafka.services`) | **Brokers** table with bootstrap candidates, **Topics** availability panel (CLI/broker status + exact command), **Data** view with backing pods, **Report**/**Raw** |
 | `--doctor` | SUPPORTED | `/doctor` (`system.doctor`) | Capability matrix parsed into rows + raw view |
@@ -49,7 +49,8 @@ Legend
 
 | Capability | Web status | Why |
 | --- | --- | --- |
-| Interactive pod log follow / `previous` / container selection | PARTIAL | Adapter exposes report-captured lines with `PARTIAL` status and an explicit warning; the engine's live follower is CLI ONLY |
+| Interactive pod logs / `previous` / container selection | SUPPORTED | `/logs` **Log Viewer** (`GET /api/v1/logs`, `GET /api/v1/containers`): one bounded read-only `kubectl logs` with pod, container, previous-instance, tail, time-window (`5m…24h`), timestamps, wrap, level filter and Follow (5 s poll). The engine's *live follower* remains CLI ONLY, so Follow is an explicit poll, never presented as a stream |
+| Resource describe / YAML / JSON / events | SUPPORTED | `/describe` **Resource Describe** (`GET /api/v1/describe`): read-only `kubectl describe`, `get -o yaml`, `get -o json` and namespace events for one object. `Secret` is refused by both the API (403) and the kubectl allowlist |
 | Full log center (raw cache, summary, audit log) | PARTIAL | Audit trail + diagnostics exposed; terminal pager is CLI ONLY |
 | Live TLS probe / certificate-vs-endpoint comparison | CLI ONLY | `POST /api/v1/tls/inspect` returns `UNAVAILABLE` with a reason instead of opening arbitrary sockets from browser input |
 | Interactive read-only PostgreSQL session | SUPPORTED | `/database` → **SQL** tab (`POST /api/v1/database/query`). Opt-in: `DSWEB_ENABLE_SQL_CONSOLE=1`. One read-only statement, server-forced read-only session, credentials never stored, logged or audited |
@@ -87,12 +88,17 @@ Legend
 | Addition | Rationale |
 | --- | --- |
 | `GET /api/v1/contexts`, `/namespaces` | Two narrowly-scoped read-only kubectl discovery calls; the engine exposes no list mode |
-| `GET /api/v1/metrics/nodes`, `/metrics/pods` | Two read-only `kubectl top` calls. The engine reports declared requests/limits, never observed usage, so the usage charts and the CPU/Memory table columns have no engine source. Degrades to `UNAVAILABLE` without metrics-server; see docs/SECURITY.md §2 |
+| `GET /api/v1/metrics/nodes`, `/metrics/pods` | Two read-only `kubectl top` calls. The engine reports declared requests/limits, never observed usage, so the usage charts and the CPU/Memory table columns have no engine source. Degrades to `UNAVAILABLE` without metrics-server; see docs/SECURITY.md §2. The charts carry a **minutes → hours → days** range selector (`1m,5m,15m,1h,6h,24h,7d`); because the Metrics API is instantaneous, the selector re-frames and buckets the samples collected since the page opened and the caption states the real span, so a wide window never implies unobserved history |
+| `GET /api/v1/logs`, `/api/v1/containers` | The engine captures pod logs only through its interactive `logs_capture` menu (no `--logs` mode). One bounded read-only `kubectl logs` per view with a pinned option surface; container discovery is one `get pod -o json` |
+| `GET /api/v1/describe` | The engine has no `--describe` mode. Read-only `describe` / `get -o yaml|json` / `get events -o json` for a non-Secret kind, redacted before it leaves the process |
 | `GET /api/v1/system` (`nodeAddress`) + `defaultHost` on both console probes | One read-only `kubectl get nodes` call. A NodePort answers on a *node*, never on `127.0.0.1` — inside a vcluster only the API port is published to the host — so the opt-in Database/Kafka views need the node address to prefill a host that actually works; see docs/SECURITY.md §2 |
 | `GET /api/v1/database/services`, `/kafka/services` | Structured views of the engine's own discovery tables (metadata only) so the pages can render tables instead of raw text |
 | `GET /api/v1/database/console`, `POST /api/v1/database/query` | **Opt-in** (`DSWEB_ENABLE_SQL_CONSOLE=1`). Read-only SQL console; see docs/SECURITY.md §2a for the full contract |
 | `GET /api/v1/kafka/console`, `POST /api/v1/kafka/topics` | **Opt-in** (`DSWEB_ENABLE_KAFKA_TOPICS=1`). One read-only Kafka Metadata v1 request; see docs/SECURITY.md §2a |
 | `GET /api/v1/system`, `/session`, `/diagnostics` | Web-only surface (versions, cache stats, audit trail) |
+| `GET /api/v1/connections`, `POST /connections/{probe,activate,deactivate,auto,import,pair}` | The engine assumes exactly one kubeconfig at `$KUBECONFIG` or `~/.kube/config`. A container has neither, which is why every cluster page rendered empty. The target cluster is therefore a configurable object: discovered, classified, probed and persisted locally. Read-only; the only side effect is the choice under the private state directory |
+| `GET /api/v1/connections/discover`, `POST /connections/pair` | A container cannot read the WSL filesystem, so "find the cluster" is implemented as *prove the published API port answers*. The Docker socket names the vcluster/kind/k3s container behind each port and a 12-way sweep covers the well-known API ports; every candidate is confirmed with an unauthenticated `/version`. Pairing then works out which kubeconfig opens that endpoint. A sweep finds *every* API server on the host, including ones that answer `/version` and then reject the client certificate with a 401 — that is reported as `UNAUTHORIZED` with advice, never as a missing kubeconfig. The socket is optional (`--group-add 0`) and read-only (`GET /containers/json`); the sweep works without it |
+| `GET /api/v1/settings`, `POST /settings/live` | One document for the Settings page. The two opt-in live-data features become runtime toggles, so exposing the SQL console or Kafka topic lister no longer needs a container rebuild; `DSWEB_ENABLE_*` stays the start-up default |
 | Pins, history, notes, baselines | Local operator convenience under `~/.devopssentinel-web` |
 | Export formatting (CSV/NDJSON) | Browser download convenience; values come from the engine unchanged |
 
@@ -100,8 +106,8 @@ Legend
 
 | Status | Count |
 | --- | --- |
-| SUPPORTED | 22 |
-| PARTIAL | 9 |
+| SUPPORTED | 24 |
+| PARTIAL | 8 |
 | CLI ONLY | 2 |
 | BLOCKED | 6 |
 | NOT APPLICABLE | 4 |

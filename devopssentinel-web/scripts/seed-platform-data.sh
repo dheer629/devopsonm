@@ -1,11 +1,11 @@
 #!/usr/bin/env bash
-# DevOpsSentinel Web -- seed the demo PostgreSQL with a realistic schema.
+# DevOpsSentinel Web -- seed the platform PostgreSQL with a realistic schema.
 #
-# The Database page is only interesting with real tables and rows, so the demo
+# The Database page is only interesting with real tables and rows, so the platform
 # fixtures include a small order/event schema. Everything runs through the
 # postgres pod's own `psql`, so no client tooling is required on the workstation.
 #
-#   scripts/seed-demo-data.sh [NAMESPACE]
+#   scripts/seed-platform-data.sh [NAMESPACE]
 #
 # Read-only note: the *application* only ever issues read-only statements. This
 # script is dev-setup tooling and is the only place that writes to the database.
@@ -15,22 +15,22 @@ NS="${1:-default}"
 
 command -v kubectl >/dev/null 2>&1 || { printf 'kubectl is required on PATH\n' >&2; exit 3; }
 
-POD=$(kubectl -n "$NS" get pods -l app=demo-postgres \
+POD=$(kubectl -n "$NS" get pods -l app=platform-postgres \
     -o jsonpath='{.items[0].metadata.name}' 2>/dev/null || true)
 if [[ -z "$POD" ]]; then
-    printf 'no demo-postgres pod found in namespace %s\n' "$NS" >&2
+    printf 'no platform-postgres pod found in namespace %s\n' "$NS" >&2
     exit 4
 fi
 
-printf '[seed-demo-data] seeding schema into %s/%s\n' "$NS" "$POD"
+printf '[seed-platform-data] seeding schema into %s/%s\n' "$NS" "$POD"
 
-kubectl -n "$NS" exec -i "$POD" -- psql -U demo -d demo -v ON_ERROR_STOP=1 -q <<'SQL'
+kubectl -n "$NS" exec -i "$POD" -- psql -U platform -d platform -v ON_ERROR_STOP=1 -q <<'SQL'
 drop view if exists public.v_customer_value;
-drop table if exists public.demo_events;
-drop table if exists public.demo_orders;
-drop table if exists public.demo_customers;
+drop table if exists public.platform_events;
+drop table if exists public.platform_orders;
+drop table if exists public.platform_customers;
 
-create table public.demo_customers (
+create table public.platform_customers (
     id        serial primary key,
     name      text not null,
     tier      text not null default 'standard',
@@ -38,9 +38,9 @@ create table public.demo_customers (
     joined_at timestamptz not null default now()
 );
 
-create table public.demo_orders (
+create table public.platform_orders (
     id          serial primary key,
-    customer_id integer not null references public.demo_customers(id),
+    customer_id integer not null references public.platform_customers(id),
     sku         text not null,
     quantity    integer not null check (quantity > 0),
     amount      numeric(10,2) not null,
@@ -48,26 +48,26 @@ create table public.demo_orders (
     created_at  timestamptz not null default now()
 );
 
-create table public.demo_events (
+create table public.platform_events (
     id         bigserial primary key,
-    order_id   integer references public.demo_orders(id),
+    order_id   integer references public.platform_orders(id),
     event_type text not null,
     payload    jsonb not null default '{}'::jsonb,
     at         timestamptz not null default now()
 );
 
-create index demo_orders_customer_idx on public.demo_orders (customer_id);
-create index demo_orders_status_idx   on public.demo_orders (status);
+create index platform_orders_customer_idx on public.platform_orders (customer_id);
+create index platform_orders_status_idx   on public.platform_orders (status);
 
 create view public.v_customer_value as
     select c.name, c.tier, c.country,
            count(o.id) as orders,
            coalesce(sum(o.amount), 0)::numeric(12,2) as revenue
-    from public.demo_customers c
-    left join public.demo_orders o on o.customer_id = c.id
+    from public.platform_customers c
+    left join public.platform_orders o on o.customer_id = c.id
     group by c.name, c.tier, c.country;
 
-insert into public.demo_customers (name, tier, country) values
+insert into public.platform_customers (name, tier, country) values
     ('Ada Lovelace',      'gold',     'GB'),
     ('Grace Hopper',      'gold',     'US'),
     ('Alan Turing',       'gold',     'GB'),
@@ -79,25 +79,25 @@ insert into public.demo_customers (name, tier, country) values
     ('Anita Borg',        'standard', 'US'),
     ('Frances Allen',     'standard', 'US');
 
-insert into public.demo_orders (customer_id, sku, quantity, amount, status, created_at)
+insert into public.platform_orders (customer_id, sku, quantity, amount, status, created_at)
 select 1 + (g * 7) % 10,
-       (array['SKU-KAFKA-01','SKU-POSTGRES-02','SKU-PVC-03','SKU-TLS-04','SKU-ETDP-05'])[1 + g % 5],
+       (array['SKU-KAFKA-01','SKU-POSTGRES-02','SKU-PVC-03','SKU-TLS-04','SKU-PLATFORM-05'])[1 + g % 5],
        1 + g % 5,
        round((9.99 + ((g * 137) % 88900) / 100.0)::numeric, 2),
        (array['pending','paid','shipped','delivered','refunded','failed'])[1 + g % 6],
        now() - (g * interval '3 hours')
 from generate_series(0, 59) as g;
 
-insert into public.demo_events (order_id, event_type, payload, at)
+insert into public.platform_events (order_id, event_type, payload, at)
 select o.id,
        (array['order.created','payment.authorized','shipment.dispatched','order.delivered'])[1 + o.id % 4],
-       jsonb_build_object('orderId', o.id, 'source', 'demo-seed'),
+       jsonb_build_object('orderId', o.id, 'source', 'platform-seed'),
        o.created_at
-from public.demo_orders o;
+from public.platform_orders o;
 
-select 'customers' as table, count(*) from public.demo_customers
-union all select 'orders', count(*) from public.demo_orders
-union all select 'events', count(*) from public.demo_events;
+select 'customers' as table, count(*) from public.platform_customers
+union all select 'orders', count(*) from public.platform_orders
+union all select 'events', count(*) from public.platform_events;
 SQL
 
-printf '[seed-demo-data] done\n'
+printf '[seed-platform-data] done\n'

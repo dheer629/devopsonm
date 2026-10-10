@@ -14,7 +14,7 @@ docker save "$IMAGE" | docker exec -i "$NODE_CONTAINER" ctr -n k8s.io images imp
 kubectl --context "$CONTEXT" apply -f deploy/flux/sync.yaml
 flux --context "$CONTEXT" reconcile source git devopsonm -n flux-system --timeout=2m
 flux --context "$CONTEXT" reconcile kustomization devopsonm -n flux-system --timeout=4m
-kubectl --context "$CONTEXT" -n devopsonm rollout status deployment/sentinel-demo --timeout=120s
+kubectl --context "$CONTEXT" -n devopsonm rollout status deployment/sentinel-platform --timeout=120s
 job="sentinel-validation-$(date +%s)"
 kubectl --context "$CONTEXT" -n devopsonm create job "$job" --from=cronjob/sentinel-validation
 kubectl --context "$CONTEXT" -n devopsonm wait --for=condition=complete "job/$job" --timeout=180s

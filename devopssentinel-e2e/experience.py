@@ -342,10 +342,13 @@ def run(h):
                 blob = path.read_text(errors='ignore')
             except OSError:
                 continue
-            for token in CANARIES + list(PRIVATE_KEY_MARKERS):
+            for index, token in enumerate(CANARIES + list(PRIVATE_KEY_MARKERS)):
                 if token in blob:
-                    hits.append((str(path), token))
-        assert not hits, 'SECURITY TEST FAILED: ' + repr(hits[:5])
+                    # Never echo the matched value: this assertion text is written
+                    # into the very reports that are scanned, which would otherwise
+                    # make the scan self-poisoning.
+                    hits.append('%s (token #%d)' % (path, index + 1))
+        assert not hits, 'SECURITY TEST FAILED: ' + ', '.join(hits[:5])
         return detail('Recursive scan of every Sentinel-generated artifact',
                       {'files': len(files)}, 'zero canary or private-key occurrences')
 

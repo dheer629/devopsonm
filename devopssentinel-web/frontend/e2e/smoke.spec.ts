@@ -82,9 +82,16 @@ test("findings center sorts critical first", async ({ page }) => {
 
 test("command palette opens with Ctrl+K and finds a pod", async ({ page }) => {
   await page.goto("/dashboard");
-  await page.keyboard.press("Control+k");
-  const search = page.getByLabel("Search", { exact: true });
-  await expect(search).toBeVisible();
+  // Wait for the shell to mount: a global shortcut sent before its listener is
+  // registered is simply lost, and that race is not what this test is about.
+  await expect(page.getByRole("heading", { name: "Operations Dashboard" })).toBeVisible();
+  await expect(async () => {
+    await page.keyboard.press("Control+k");
+    await expect(page.getByLabel("Search resources and commands")).toBeVisible({
+      timeout: 2_000,
+    });
+  }).toPass({ timeout: 15_000 });
+  const search = page.getByLabel("Search resources and commands");
   await search.fill("transformer");
   await expect(page.getByRole("option").first()).toBeVisible();
 });
@@ -108,6 +115,14 @@ test("pki dashboard summarises expiry posture", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "PKI / TLS Command Center" })).toBeVisible();
   await expect(page.getByText("≤30 days")).toBeVisible();
   await expect(page.getByText("syslog-cert").first()).toBeVisible();
+});
+
+test("pki secrets tab shows secret inventory with certificate expiry", async ({ page }) => {
+  await page.goto("/pki");
+  await page.getByRole("tab", { name: /Secrets/ }).click();
+  await expect(page.getByText("transformer-db")).toBeVisible();
+  await expect(page.getByText("kubernetes.io/tls").first()).toBeVisible();
+  await expect(page.getByText("Expires")).toBeVisible();
 });
 
 test("topology page renders the dependency inspector", async ({ page }) => {
@@ -164,9 +179,17 @@ test("browser refresh keeps the current route", async ({ page }) => {
 test("keyboard chord g d navigates to the dashboard", async ({ page }) => {
   await page.goto("/findings");
   await page.locator("body").click();
-  await page.keyboard.press("g");
-  await page.keyboard.press("d");
-  await expect(page.getByRole("heading", { name: "Operations Dashboard" })).toBeVisible();
+  // `g` arms the chord for 900 ms. A human clears that easily; a browser
+  // hosting twelve parallel workers can miss it between two separate CDP
+  // keystrokes, so retry the *gesture* (not the assertion) and keep the test
+  // measuring the chord rather than the scheduler.
+  await expect(async () => {
+    await page.keyboard.press("g");
+    await page.keyboard.press("d");
+    await expect(page.getByRole("heading", { name: "Operations Dashboard" })).toBeVisible({
+      timeout: 2_000,
+    });
+  }).toPass({ timeout: 20_000 });
 });
 
 test("incident workspace keeps notes local and shows evidence", async ({ page }) => {
@@ -216,4 +239,39 @@ test("topology discovers resources instead of demanding a typed name", async ({ 
   await expect(page.getByLabel("Resource name")).toBeVisible();
   await expect(page.getByText(/available$/)).toBeVisible();
   await expect(page.getByRole("button", { name: "GitOps chain" })).toBeVisible();
+});
+
+test("log viewer exposes pod/container/stream/window/tail options", async ({ page }) => {
+  await page.goto("/logs");
+  await expect(page.getByRole("heading", { name: "Log Viewer" })).toBeVisible();
+  await expect(page.getByLabel("Pod")).toBeVisible();
+  await expect(page.getByLabel("Container")).toBeVisible();
+  await expect(page.getByLabel("Time window")).toBeVisible();
+  await expect(page.getByLabel("Tail lines")).toBeVisible();
+  await expect(page.getByLabel("Follow logs")).toBeVisible();
+  await expect(page.getByLabel("Search logs")).toBeVisible();
+  // The captured lines render with their level and text.
+  await expect(page.getByText("ERROR certificate verify failed").first()).toBeVisible();
+  await expect(page.getByText("Repeated patterns")).toBeVisible();
+});
+
+test("resource describe viewer offers describe/yaml/json/events options", async ({ page }) => {
+  await page.goto("/describe");
+  await expect(page.getByRole("heading", { name: "Resource Description" })).toBeVisible();
+  await expect(page.getByLabel("Kind")).toBeVisible();
+  await expect(page.getByLabel("Resource name")).toBeVisible();
+  await expect(page.getByRole("button", { name: "YAML" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "JSON" })).toBeVisible();
+  await expect(page.getByRole("button", { name: "Events" })).toBeVisible();
+  await expect(page.getByText("Name: log-transformer-def")).toBeVisible();
+});
+
+test("metrics charts expose a minutes/hours/days range selector", async ({ page }) => {
+  await page.goto("/workloads");
+  const range = page.getByLabel("Metrics range");
+  await expect(range).toBeVisible();
+  await range.selectOption("1h");
+  await expect(range).toHaveValue("1h");
+  // The chart states the window it is showing instead of implying more history.
+  await expect(page.getByText(/1 hour window/).first()).toBeVisible();
 });

@@ -26,7 +26,7 @@ PYTHON_BIN="${PYTHON:-}"
 
 usage() {
     cat <<'HELP'
-DevOpsSentinel Web -- local read-only Kubernetes / GitOps / PKI / ETDP console
+DevOpsSentinel Web -- local read-only Kubernetes / GitOps / PKI / application profile console
 
   ./devopssentinel-web [options]
 

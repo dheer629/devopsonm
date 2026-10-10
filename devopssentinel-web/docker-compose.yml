@@ -1,0 +1,31 @@
+# DevOpsSentinel Web -- Docker Desktop / Compose.
+#
+#   docker compose -f devopssentinel-web/docker-compose.yml up -d --build
+#   open http://127.0.0.1:8765
+#
+# The build context is the repository root because the FastAPI backend resolves
+# the Bash engine one directory above the web project (backend/app/config.py).
+services:
+  devopssentinel-web:
+    build:
+      context: ..
+      dockerfile: devopssentinel-web/Dockerfile
+    image: devopssentinel-web:1.0.0
+    container_name: devopssentinel-web
+    restart: unless-stopped
+    # Loopback only, matching the application's own bind policy and origin
+    # allow-list. Publish on 0.0.0.0 only if you also set DSWEB_ACCESS_TOKEN.
+    ports:
+      - "127.0.0.1:8765:8765"
+    environment:
+      DSWEB_HOST: "0.0.0.0"
+      DSWEB_PORT: "8765"
+      # Opt-in live-data features. Both default to OFF in the image; uncomment
+      # to expose the read-only SQL console and the Kafka topic lister.
+      # DSWEB_ENABLE_SQL_CONSOLE: "1"
+      # DSWEB_ENABLE_KAFKA_TOPICS: "1"
+    # Make the cluster pages live by mounting a kubeconfig read-only. The file
+    # must already exist; the container never receives credentials it was not
+    # explicitly given.
+    # volumes:
+    #   - ${USERPROFILE}/.kube/config:/home/dsweb/.kube/config:ro

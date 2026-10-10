@@ -9,6 +9,7 @@ and a Kafka broker directly (see ``api/live.py``); both are disabled by default.
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from contextlib import asynccontextmanager
 from pathlib import Path
@@ -18,7 +19,20 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 
-from .api import gitops, graph, live, network, operations, pki, sse, storage, system, workloads
+from .api import (
+    connections,
+    gitops,
+    graph,
+    inspect,
+    live,
+    network,
+    operations,
+    pki,
+    sse,
+    storage,
+    system,
+    workloads,
+)
 from .config import API_SCHEMA_VERSION, SUPERVISION_MODE, WEB_VERSION, settings
 from .security import origin_allowed
 
@@ -50,15 +64,67 @@ async def lifespan(app: FastAPI):
         settings.engine_path,
         settings.engine_available(),
     )
+    task: asyncio.Task[None] | None = None
+    if settings.autoconnect:
+        task = asyncio.create_task(_autoconnect())
     yield
+    if task is not None and not task.done():
+        task.cancel()
     logger.info("DevOpsSentinel Web shutting down")
+
+
+async def _autoconnect() -> None:
+    """Connect to a reachable cluster in the background at startup.
+
+    Runs off the request path, so a slow probe never delays the first page, and
+    never overrides a connection that already works. This exists because a
+    console that opens with no cluster looks broken: the operator should not have
+    to find Settings before any data appears. The Docker/WSL case in particular
+    is not solvable from the kubeconfig alone -- a vcluster names a host
+    port-forward that does not resolve inside a container -- so the endpoint
+    discovery in ``auto_connect`` does the work.
+    """
+    from .services import connections
+
+    try:
+        health = await asyncio.to_thread(connections.check_active)
+        if health.get("reachable"):
+            logger.info(
+                "cluster connection is already healthy (%s at %s)",
+                health.get("context"),
+                health.get("server"),
+            )
+            return
+        if health.get("configured"):
+            logger.info(
+                "active connection %s is not reachable (%s); reconnecting",
+                health.get("server"),
+                health.get("reason") or "unknown",
+            )
+        report = await asyncio.to_thread(connections.auto_connect)
+        activated = report.get("activated")
+        if activated:
+            logger.info(
+                "auto-connected to %s at %s (detected via %s)",
+                activated.get("context"),
+                report.get("serverOverride") or activated.get("server"),
+                (report.get("detected") or {}).get("source") or "kubeconfig",
+            )
+        else:
+            logger.info(
+                "auto-connect found no reachable cluster (%s)", report.get("reason")
+            )
+    except asyncio.CancelledError:  # pragma: no cover - shutdown
+        raise
+    except Exception:  # noqa: BLE001 - startup must never fail on this
+        logger.warning("auto-connect failed", exc_info=True)
 
 
 def create_app() -> FastAPI:
     app = FastAPI(
         title="DevOpsSentinel Web API",
         version=WEB_VERSION,
-        description="Local read-only Kubernetes / GitOps / PKI / ETDP control center.",
+        description="Local read-only Kubernetes / GitOps / PKI / application profile control center.",
         lifespan=lifespan,
         docs_url="/api/docs",
         openapi_url="/api/openapi.json",
@@ -79,7 +145,18 @@ def create_app() -> FastAPI:
         if request.method in STATE_CHANGING and not origin_allowed(origin, settings.allowed_origins):
             return JSONResponse(
                 status_code=403,
-                content={"detail": "origin not allowed", "origin": origin},
+                content={
+                    "detail": "origin not allowed",
+                    "origin": origin,
+                    # A page served on a port the backend does not trust fails
+                    # every state-changing request while every read succeeds, so
+                    # say what *is* trusted instead of only what was rejected.
+                    "allowed": list(settings.allowed_origins),
+                    "hint": (
+                        "the page must be served from one of the allowed origins; "
+                        "set DSWEB_ALLOWED_ORIGINS to add another"
+                    ),
+                },
             )
         if request.method in STATE_CHANGING:
             length = request.headers.get("content-length")
@@ -90,7 +167,20 @@ def create_app() -> FastAPI:
             response.headers.setdefault(key, value)
         return response
 
-    for module in (system, workloads, graph, gitops, pki, network, storage, operations, sse, live):
+    for module in (
+        connections,
+        system,
+        workloads,
+        graph,
+        gitops,
+        pki,
+        network,
+        storage,
+        operations,
+        inspect,
+        sse,
+        live,
+    ):
         app.include_router(module.router)
 
     @app.get("/api/v1/version", tags=["system"])

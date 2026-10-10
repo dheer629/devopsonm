@@ -4,6 +4,7 @@ import {
   Boxes,
   Database,
   Download,
+  FileSearch,
   FileWarning,
   Gauge,
   GitBranch,
@@ -12,6 +13,7 @@ import {
   Layers,
   Network,
   Radio,
+  ScrollText,
   Server,
   Settings,
   ShieldCheck,
@@ -52,9 +54,11 @@ export const NAV_SECTIONS: NavSection[] = [
     label: "Workloads",
     items: [
       { to: "/workloads", label: "Pods", icon: Boxes, domain: "kubernetes", match: ["/pods/"] },
+      { to: "/logs", label: "Log Viewer", icon: ScrollText },
+      { to: "/describe", label: "Resource Describe", icon: FileSearch },
       { to: "/events", label: "Events", icon: Activity },
       { to: "/topology", label: "Topology", icon: Waypoints },
-      { to: "/etdp", label: "ETDP", icon: Layers },
+      { to: "/application", label: "Application Profile", icon: Layers },
     ],
   },
   {

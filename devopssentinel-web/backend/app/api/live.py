@@ -1,9 +1,11 @@
 """Opt-in live-data endpoints: read-only SQL console + Kafka topic listing.
 
-Both are **disabled by default** and only exist when the operator explicitly sets
-``DSWEB_ENABLE_SQL_CONSOLE=1`` / ``DSWEB_ENABLE_KAFKA_TOPICS=1``. They are the
-only code paths in this application that talk to something other than the
-DevOpsSentinel engine, and they are documented as such in docs/SECURITY.md.
+Both are **off by default** and only exist once an operator turns them on -- either
+at start-up with ``DSWEB_ENABLE_SQL_CONSOLE=1`` / ``DSWEB_ENABLE_KAFKA_TOPICS=1``,
+or at runtime with the matching switch on the Settings page, which applies
+immediately and needs no restart (``services.liveconfig``). They are the only code
+paths in this application that talk to something other than the DevOpsSentinel
+engine, and they are documented as such in docs/SECURITY.md.
 """
 
 from __future__ import annotations
@@ -15,7 +17,7 @@ from pydantic import BaseModel, Field
 
 from ..config import settings
 from ..models import make_envelope
-from ..services import kafkatool, kube, sqltool
+from ..services import kafkatool, kube, liveconfig, sqltool
 
 router = APIRouter(prefix="/api/v1", tags=["live"])
 
@@ -45,11 +47,14 @@ async def _node_address(context: str) -> str:
 @router.get("/database/console")
 async def database_console(context: str = Query("")) -> dict:
     """Report whether the read-only SQL console can be used."""
-    enabled = settings.enable_sql_console
+    enabled = liveconfig.sql_console_enabled()
     driver = _pg_driver_available()
     reason = ""
     if not enabled:
-        reason = "disabled: start the backend with DSWEB_ENABLE_SQL_CONSOLE=1"
+        reason = (
+            "disabled: turn on the Read-only SQL console switch in Settings"
+            " (it applies immediately, no restart needed)"
+        )
     elif not driver:
         reason = "the pg8000 driver is not installed on the server"
     return make_envelope(
@@ -79,10 +84,10 @@ class QueryRequest(BaseModel):
 @router.post("/database/query")
 async def database_query(payload: QueryRequest) -> dict:
     """Run ONE read-only statement. Credentials are never stored or logged."""
-    if not settings.enable_sql_console:
+    if not liveconfig.sql_console_enabled():
         raise HTTPException(
             status_code=403,
-            detail="the read-only SQL console is disabled (set DSWEB_ENABLE_SQL_CONSOLE=1)",
+            detail="the read-only SQL console is disabled (enable it in Settings)",
         )
     try:
         result = await sqltool.run_query(
@@ -113,8 +118,13 @@ async def database_query(payload: QueryRequest) -> dict:
 @router.get("/kafka/console")
 async def kafka_console(context: str = Query("")) -> dict:
     """Report whether Kafka topic listing can be used."""
-    enabled = settings.enable_kafka_topics
-    reason = "" if enabled else "disabled: start the backend with DSWEB_ENABLE_KAFKA_TOPICS=1"
+    enabled = liveconfig.kafka_topics_enabled()
+    reason = (
+        ""
+        if enabled
+        else "disabled: turn on the Kafka topic listing switch in Settings"
+        " (it applies immediately, no restart needed)"
+    )
     return make_envelope(
         {
             "enabled": enabled,
@@ -136,10 +146,10 @@ class TopicsRequest(BaseModel):
 @router.post("/kafka/topics")
 async def kafka_topics(payload: TopicsRequest) -> dict:
     """List topics with a single read-only Kafka Metadata request."""
-    if not settings.enable_kafka_topics:
+    if not liveconfig.kafka_topics_enabled():
         raise HTTPException(
             status_code=403,
-            detail="Kafka topic listing is disabled (set DSWEB_ENABLE_KAFKA_TOPICS=1)",
+            detail="Kafka topic listing is disabled (enable it in Settings)",
         )
     try:
         listing = await kafkatool.list_topics(

@@ -17,6 +17,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { GitOpsDetail } from "@/features/gitops/GitOpsDetail";
 import { severityRank } from "@/lib/status";
 import { useApp } from "@/state/AppContext";
 import type { GitOpsObject } from "@/types";
@@ -35,6 +36,7 @@ export function GitOpsPage() {
   const gitops = useGitOps(scope);
   const graph = useGitOpsGraph(scope);
   const [kind, setKind] = useState("ALL");
+  const [selected, setSelected] = useState<{ kind: string; name: string } | null>(null);
 
   const rows = useMemo(() => {
     const all = [...(gitops.data?.envelope.data ?? [])].sort(
@@ -129,9 +131,11 @@ export function GitOpsPage() {
         </Card>
       ) : null}
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Flux chain</CardTitle>
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1 space-y-3">
+          <Card>
+            <CardHeader>
+              <CardTitle>Flux chain</CardTitle>
           <Badge tone="gitops">source → kustomization → helmrelease → workload</Badge>
         </CardHeader>
         <CardBody className="space-y-2">
@@ -185,14 +189,26 @@ export function GitOpsPage() {
                     columns={columns}
                     exportName="devopssentinel-gitops"
                     emptyMessage="No GitOps objects of this kind were reported."
-                    onRowClick={(obj) => setSelection({ kind: obj.kind, name: obj.name })}
+                    onRowClick={(obj) => {
+                      setSelected({ kind: obj.kind, name: obj.name });
+                      setSelection({ kind: obj.kind, name: obj.name });
+                    }}
                   />
                 ) : null}
               </CardBody>
             </Card>
           </TabsContent>
         ))}
-      </Tabs>
+          </Tabs>
+        </div>
+        {selected ? (
+          <GitOpsDetail
+            kind={selected.kind}
+            name={selected.name}
+            onClose={() => setSelected(null)}
+          />
+        ) : null}
+      </div>
 
       <p className="text-[11px] text-text-muted">
         Supervision mode never offers Reconcile, Suspend, Resume, Upgrade or Rollback. Generation and

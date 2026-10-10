@@ -1,5 +1,5 @@
 import type { ColumnDef } from "@tanstack/react-table";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 
 import { usePods, useNodeMetrics, usePodMetrics, useWorkloads } from "@/api/queries";
@@ -8,7 +8,17 @@ import { ErrorState, Freshness, LoadingRows, PageHeader, PartialBanner, StatusPi
 import { Badge } from "@/components/ui/badge";
 import { Card, CardBody, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { UsageBar, UsageChart, useUsageHistory } from "@/components/Usage";
+import {
+  DEFAULT_USAGE_RANGE,
+  RangeSelect,
+  rangeSummary,
+  UsageBar,
+  UsageChart,
+  usageRangeMs,
+  useUsageHistory,
+  windowedSeries,
+  type UsageRangeId,
+} from "@/components/Usage";
 import { formatBytes, formatCores } from "@/lib/format";
 import { severityRank } from "@/lib/status";
 import { useApp } from "@/state/AppContext";
@@ -47,8 +57,22 @@ export function WorkloadsPage() {
     () => nodes.reduce((total, node) => total + node.memoryBytes, 0),
     [nodes],
   );
-  const cpuHistory = useUsageHistory(nodeStamp, nodeCores);
-  const memoryHistory = useUsageHistory(nodeStamp, nodeMemory);
+  // Chart only what was actually measured. An UNAVAILABLE envelope still carries
+  // a fresh timestamp, so passing a value unconditionally appends a zero that no
+  // `kubectl top` ever reported -- and the chart then draws an axis for it while
+  // the honest "unavailable" message stays unreachable.
+  const nodeUsageMeasured = nodeMetrics.data?.source === "LIVE" && nodes.length > 0;
+  const cpuHistory = useUsageHistory(nodeStamp, nodeUsageMeasured ? nodeCores : undefined);
+  const memoryHistory = useUsageHistory(nodeStamp, nodeUsageMeasured ? nodeMemory : undefined);
+  const [range, setRange] = useState<UsageRangeId>(DEFAULT_USAGE_RANGE);
+  const rangeMs = usageRangeMs(range);
+  const cpuWindow = useMemo(() => windowedSeries(cpuHistory, rangeMs), [cpuHistory, rangeMs]);
+  const memoryWindow = useMemo(
+    () => windowedSeries(memoryHistory, rangeMs),
+    [memoryHistory, rangeMs],
+  );
+  const cpuNote = rangeSummary(cpuWindow, range);
+  const memoryNote = rangeSummary(memoryWindow, range);
   const metricsUnavailable = (nodeMetrics.data?.errors.length ?? 0) > 0;
 
   const workloadRows = useMemo(
@@ -162,6 +186,7 @@ export function WorkloadsPage() {
         }
         actions={
           <div className="flex items-center gap-2">
+            <RangeSelect value={range} onChange={setRange} />
             <Badge tone="neutral">namespace {scope.namespace || "—"}</Badge>
             {workloads.data ? <Freshness envelope={workloads.data.envelope} /> : null}
           </div>
@@ -180,9 +205,10 @@ export function WorkloadsPage() {
           </CardHeader>
           <CardBody className="pt-1">
             <UsageChart
-              points={cpuHistory}
+              points={cpuWindow}
               kind="cpu"
               color="var(--c-success)"
+              note={cpuNote}
               emptyMessage={
                 metricsUnavailable
                   ? "Metrics API unavailable — install metrics-server to chart live usage."
@@ -200,9 +226,10 @@ export function WorkloadsPage() {
           </CardHeader>
           <CardBody className="pt-1">
             <UsageChart
-              points={memoryHistory}
+              points={memoryWindow}
               kind="memory"
               color="var(--c-kubernetes)"
+              note={memoryNote}
               emptyMessage={
                 metricsUnavailable
                   ? "Metrics API unavailable — install metrics-server to chart live usage."

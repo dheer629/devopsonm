@@ -60,6 +60,34 @@ kubectl --context vcluster-docker_dev -n kube-system patch configmap coredns \
 
 The repository's Flux objects are `flux-system/GitRepository/devopsonm` and `flux-system/Kustomization/devopsonm`, tracking `main` at `./deploy/local`. The deployment script verifies source reconciliation, manifest reconciliation, workload rollout and one validation Job. The local image must be rebuilt/imported after utility changes; this is not a registry publishing pipeline.
 
+## Bundled toolchain and self-extracting release — 4 October 2026
+
+The bundled-toolchain registry and the release pipeline were validated on the
+same WSL host.
+
+| Check | Result |
+| --- | --- |
+| Engine syntax (`bash -n`) | Passed |
+| Built-in offline suites | **22/22 passed** (new `Bundled toolchain fixtures` case added) |
+| Upstream component SHA-256 | `kubectl` v1.31.4, `helm` v3.16.4, `flux` v2.4.0, `jq` jq-1.7.1 **verified**; `yq` v4.44.6 recorded for review |
+| Payload assembly | 5 components, 58 MB; `release-manifest.json` written |
+| Self-extracting artifact | `DevOpsSentinel_4.2.2_linux-amd64.run`, 77 MB |
+| Bundle tests under a minimal `PATH` (`/usr/bin:/bin`) | **14/14 passed** |
+
+The bundle suite (`build/test-bundle.sh`) runs the real artifact, not the source,
+inside an isolated `HOME` with `jq`, `helm`, `flux`, `psql` and `kcat` absent from
+`PATH`. It confirms self-extraction, extraction beneath `$HOME/bin`, bundled
+kubectl/helm/flux/jq/yq in use, isolation, offline readiness, architecture
+detection, runtime reuse, the read-only guard, and — by appending one byte to the
+extracted `flux` binary — that a corrupted component is rejected and reported.
+
+`psql`, `kcat`, `openssl` and `curl` are not bundled by default: no authoritative
+static Linux binary is published for them, so bundling would mean redistributing a
+third-party build. Until a source is pinned the engine's fallback hierarchy uses
+the host copy and reports the component `SYSTEM` or `UNAVAILABLE` rather than
+failing. `--components` prints the feature dependency matrix showing exactly which
+features are `BUNDLED` and which are not.
+
 ## Coverage limits
 
 Metrics-server and cert-manager are absent on this cluster, so their absence paths were exercised live and their parsing logic was covered by fixtures. No live Kafka, Splunk or authenticated PostgreSQL diagnostic session was performed; discovery and applicable offline fixtures were tested. No HelmRelease exists here. Certificate metadata/expiry were tested with a generated TLS Secret; arbitrary external TLS endpoints and every interactive menu permutation were not exercised. ShellCheck was run at error severity, not as a warning-free certification. These results establish the tested local behavior, not universal production readiness.

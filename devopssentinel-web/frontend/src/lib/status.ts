@@ -77,7 +77,7 @@ export const DOMAIN_COLOR: Record<string, string> = {
   storage: "text-storage",
   database: "text-network",
   kafka: "text-gitops",
-  etdp: "text-kubernetes",
+  application: "text-kubernetes",
   general: "text-text-muted",
   system: "text-text-muted",
 };

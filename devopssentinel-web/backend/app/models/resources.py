@@ -75,6 +75,30 @@ class Certificate(BaseModel):
     status: Severity = "UNKNOWN"
     consumers: int = 0
     gitops: str = ""
+    serial: str = ""
+    fingerprint: str = ""
+    not_before: str = ""
+    san: str = ""
+    source: str = ""
+
+
+class SecretRecord(BaseModel):
+    """A Kubernetes Secret plus the expiry of any certificate it carries.
+
+    Only Secret *metadata* and certificate validity are exposed. Data values,
+    including ``tls.key``, are never requested or transported.
+    """
+
+    name: str
+    namespace: str = ""
+    type: str = ""
+    created: str = ""
+    key_count: int = 0
+    keys: str = ""
+    is_tls: bool = False
+    expires: str = ""
+    days: int | None = None
+    status: Severity = "UNKNOWN"
 
 
 class GitOpsObject(BaseModel):
@@ -157,6 +181,10 @@ class GraphEdge(BaseModel):
     target: str
     label: str = "DEPENDS_ON"
     confidence: Confidence = "CONFIRMED"
+    # The engine report line this relationship was read from. Kept so the UI can
+    # answer "why are these two objects connected?" without inventing a reason
+    # (spec sections 37, 347): the evidence is the engine's own statement.
+    evidence: str = ""
 
 
 class Graph(BaseModel):
@@ -175,6 +203,7 @@ class LogLine(BaseModel):
     n: int
     text: str
     level: str = "INFO"
+    ts: str = ""
 
 
 class LogBundle(BaseModel):
@@ -183,6 +212,37 @@ class LogBundle(BaseModel):
     previous: bool = False
     lines: list[LogLine] = Field(default_factory=list)
     patterns: list[dict[str, object]] = Field(default_factory=list)
+    # Echo of the selected options so the viewer can state exactly what it read.
+    since: str = ""
+    tail: int = 0
+    timestamps: bool = True
+    containers: list[str] = Field(default_factory=list)
+
+
+class ResourceEvent(BaseModel):
+    """One Kubernetes Event row from the description viewer's Events option."""
+
+    time: str = ""
+    type: str = ""
+    reason: str = ""
+    object: str = ""
+    count: int = 1
+    message: str = ""
+
+
+class ResourceDescription(BaseModel):
+    """A read-only describe / get / events result for one resource.
+
+    ``content`` holds the (redacted) text for describe/yaml/json; ``events`` is
+    populated only for ``format == "events"``.
+    """
+
+    kind: str
+    name: str
+    namespace: str = ""
+    format: str = "describe"
+    content: str = ""
+    events: list[ResourceEvent] = Field(default_factory=list)
 
 
 class SearchResult(BaseModel):

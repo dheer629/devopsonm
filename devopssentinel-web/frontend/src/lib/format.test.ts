@@ -39,6 +39,11 @@ describe("formatBytes", () => {
     expect(formatBytes(-5)).toBe("0");
     expect(formatBytes(512)).toBe("512 B");
   });
+
+  it("rounds the fractional values that chart tick interpolation produces", () => {
+    expect(formatBytes(0.6699999999999999)).toBe("0.67 B");
+    expect(formatBytes(0.33999999999999997)).toBe("0.34 B");
+  });
 });
 
 describe("reportText", () => {

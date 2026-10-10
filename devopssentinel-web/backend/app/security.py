@@ -41,8 +41,8 @@ def _looks_like_json(line: str) -> bool:
     return stripped.startswith("{") or stripped.startswith("[")
 
 
-def _redact_value(value: str) -> str:
-    """Redact a single unstructured string (used for JSON string values)."""
+def _redact_scalar(value: str) -> str:
+    """Redact a single unstructured string (one JSON value or one table cell)."""
     value = _URL_CRED.sub(r"\1[REDACTED]@", value)
     value = _KV_CRED.sub(lambda m: f"{m.group(1)}={REDACTED}", value)
     value = _BEARER.sub(lambda m: f"{m.group(1)} {REDACTED}", value)
@@ -51,6 +51,21 @@ def _redact_value(value: str) -> str:
     if _REDACT_LINE.search(value):
         value = REDACTED
     return value
+
+
+def _redact_value(value: str) -> str:
+    """Redact a JSON string value.
+
+    TAB-separated engine rows are redacted **cell by cell**. The engine emits
+    report tables as TAB-separated rows, so replacing a whole row because one
+    cell mentions a credential keyword would collapse the row to a single token
+    and destroy the table shape (parsers then see a one-cell line and stop,
+    silently dropping every later row). Redacting only the offending cell keeps
+    every non-sensitive column intact.
+    """
+    if "\t" in value:
+        return "\t".join(_redact_scalar(cell) for cell in value.split("\t"))
+    return _redact_scalar(value)
 
 
 def _redact_json_document(text: str) -> str | None:
@@ -103,6 +118,11 @@ def redact_text(text: str) -> str:
         if in_pem:
             if "-----end" in low and "private key-----" in low:
                 in_pem = False
+            continue
+        if "\t" in line:
+            # Engine table row: redact only the offending cells so the row (and
+            # therefore the table) survives parsing.
+            out_lines.append("\t".join(_redact_scalar(cell) for cell in line.split("\t")))
             continue
         line = _URL_CRED.sub(r"\1[REDACTED]@", line)
         line = _KV_CRED.sub(lambda m: f"{m.group(1)}={REDACTED}", line)

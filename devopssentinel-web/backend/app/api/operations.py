@@ -2,6 +2,9 @@
 
 from __future__ import annotations
 
+import asyncio
+import time
+
 from fastapi import APIRouter, Body, Depends, HTTPException, Query
 from fastapi.responses import Response
 from pydantic import BaseModel
@@ -10,11 +13,15 @@ from ..models import make_envelope
 from ..security import validate_incident_id, validate_name
 from ..services import evidence as evidence_svc
 from ..services.parsers import (
+    normalize_certificates,
     normalize_db_services,
     normalize_events,
     normalize_findings,
+    normalize_gitops,
     normalize_kafka_services,
     normalize_pods,
+    normalize_pvcs,
+    normalize_services,
 )
 from ..services.sessions import sessions
 from .deps import Scope, invoke, scope
@@ -37,12 +44,66 @@ async def triage(sc: Scope = Depends(scope), force: bool = Query(False)) -> dict
 
 
 @router.get("/events")
-async def events(sc: Scope = Depends(scope)) -> dict:
-    return await invoke(
+async def events(sc: Scope = Depends(scope), force: bool = Query(False)) -> dict:
+    """Namespace events.
+
+    Preferred path is one bounded read-only ``kubectl get events -o json``: it
+    works as soon as a connection is active and costs a single API call. The
+    engine's triage report stays as the fallback, so an engine-only deployment
+    still returns data.
+
+    Both paths must answer with the same ``{envelope, raw, exitStatus}`` shape.
+    The browser reads ``envelope``, so returning a bare envelope here made the
+    page throw on ``.envelope.data`` whenever the live path won -- which is the
+    normal case, and why the fixture-backed E2E suite never saw it.
+    """
+    from ..services import kube
+    from ..services.parsers import normalize_live_events
+
+    warnings: list[str] = []
+    started = time.perf_counter()
+    try:
+        rows, stdout = await kube.events_with_raw(
+            context=sc.context, namespace=sc.namespace
+        )
+    except kube.KubeError as exc:
+        rows, stdout = [], ""
+        warnings.append(str(exc))
+    if rows:
+        duration_ms = int((time.perf_counter() - started) * 1000)
+        argv = kube.events_argv(context=sc.context, namespace=sc.namespace)
+        envelope = make_envelope(
+            [e.model_dump() for e in normalize_live_events(rows, sc.namespace)],
+            context=sc.context,
+            namespace=sc.namespace,
+            source="LIVE",
+            status="OK",
+            duration_ms=duration_ms,
+            warnings=warnings,
+        )
+        return {
+            "envelope": envelope.model_dump(),
+            "raw": {
+                "engineArgv": ["kubectl", *argv],
+                "readOnlyCommand": kube.command_string(argv),
+                "exitStatus": 0,
+                "stdout": stdout,
+                "stderr": "",
+                "durationMs": duration_ms,
+            },
+            "exitStatus": 0,
+        }
+
+    result = await invoke(
         "workloads.triage",
         sc,
         normalizer=lambda lines, ns: [e.model_dump() for e in normalize_events(lines, ns)],
+        force=force,
     )
+    if warnings:
+        envelope = result.get("envelope") or {}
+        envelope["warnings"] = [*envelope.get("warnings", []), *warnings]
+    return result
 
 
 @router.get("/snapshot")
@@ -50,9 +111,9 @@ async def snapshot(sc: Scope = Depends(scope)) -> dict:
     return await invoke("system.snapshot", sc)
 
 
-@router.get("/etdp")
-async def etdp(sc: Scope = Depends(scope)) -> dict:
-    return await invoke("etdp.platform", sc)
+@router.get("/application-profile")
+async def application_profile(sc: Scope = Depends(scope)) -> dict:
+    return await invoke("application.profile", sc)
 
 
 @router.get("/database")
@@ -89,37 +150,189 @@ async def kafka_services(sc: Scope = Depends(scope)) -> dict:
     )
 
 
+# --------------------------------------------------------------------------
+# Global search (spec 11-12): one query across every domain the engine can
+# enumerate read-only. This reuses the engine operations the domain pages
+# already call -- it adds no Kubernetes logic of its own.
+# --------------------------------------------------------------------------
+
+# kind prefix -> canonical result kind
+_PREFIX_KINDS: dict[str, str] = {
+    "pod": "Pod",
+    "pods": "Pod",
+    "svc": "Service",
+    "service": "Service",
+    "services": "Service",
+    "cert": "Certificate",
+    "certs": "Certificate",
+    "certificate": "Certificate",
+    "certificates": "Certificate",
+    "gitops": "GitOps",
+    "flux": "GitOps",
+    "helm": "GitOps",
+    "pvc": "PVC",
+    "storage": "PVC",
+    "finding": "Finding",
+    "findings": "Finding",
+}
+
+# The state field each domain reports, in priority order.
+_STATE_KEYS = ("status", "state", "severity", "health", "ready")
+
+
+def _parse_search_query(raw: str) -> tuple[list[str], dict[str, str]]:
+    """Split ``status:failed ns:payments transformer`` into terms + filters."""
+    terms: list[str] = []
+    filters: dict[str, str] = {}
+    for token in raw.split():
+        key, sep, value = token.partition(":")
+        if sep:
+            key = key.lower()
+            if key in _PREFIX_KINDS:
+                # A bare `cert:` means "every certificate", not a search for
+                # the literal text `cert:`.
+                filters["kind"] = _PREFIX_KINDS[key]
+                if value:
+                    terms.append(value.lower())
+                continue
+            if value and key in ("ns", "namespace"):
+                filters["namespace"] = value.lower()
+                continue
+            if value and key in ("status", "state"):
+                filters["state"] = value.lower()
+                continue
+        terms.append(token.lower())
+    return terms, filters
+
+
+def _search_row_state(row: dict) -> str:
+    for key in _STATE_KEYS:
+        value = row.get(key)
+        if isinstance(value, bool):
+            return "OK" if value else "FAILED"
+        if value:
+            return str(value).upper()
+    return "UNKNOWN"
+
+
+def _row_matches(row: dict, terms: list[str], filters: dict[str, str]) -> bool:
+    if filters.get("kind") and row["kind"] != filters["kind"]:
+        return False
+    if filters.get("namespace") and filters["namespace"] not in row["namespace"].lower():
+        return False
+    if filters.get("state") and filters["state"] not in row["state"].lower():
+        return False
+    if not terms:
+        return True
+    haystack = f"{row['name']} {row['namespace']}".lower()
+    # Lower-case defensively: the parser already normalises, but a direct
+    # caller must not have to know that.
+    return all(term.lower() in haystack for term in terms)
+
+
+async def _search_domain(
+    spec_id: str,
+    normalizer,
+    kind: str,
+    route: str,
+    sc: Scope,
+) -> tuple[list[dict], str]:
+    """Run one engine operation and shape its rows as search results.
+
+    Returns ``(rows, source)`` where source is the engine's own provenance
+    (``LIVE``/``CACHE``/``UNAVAILABLE``) so the UI can attribute each hit.
+    """
+
+    def _rows(lines: list[str], ns: str) -> list[dict]:
+        return [row.model_dump() for row in normalizer(lines, ns)]
+
+    result = await invoke(spec_id, sc, normalizer=_rows)
+    envelope = result.get("envelope") or {}
+    rows: list[dict] = []
+    for row in envelope.get("data") or []:
+        if not isinstance(row, dict) or not row.get("name"):
+            continue
+        rows.append(
+            {
+                "kind": kind,
+                "name": str(row.get("name", "")),
+                "namespace": str(row.get("namespace", "") or sc.namespace),
+                "route": route.format(name=row.get("name", "")),
+                "state": _search_row_state(row),
+                "source": str(envelope.get("source", "UNAVAILABLE")),
+                "engine": spec_id,
+            }
+        )
+    return rows, str(envelope.get("source", "UNAVAILABLE"))
+
+
 @router.get("/search")
 async def search(
     q: str = Query(..., min_length=1, max_length=128),
     sc: Scope = Depends(scope),
 ) -> dict:
-    """Search across the resources the engine can enumerate read-only."""
-    needle = q.lower()
-    results: list[dict] = []
+    """Search every enumerable domain in one query.
 
-    resources = await invoke(
-        "workloads.resources",
-        sc,
-        normalizer=lambda lines, ns: [p.model_dump() for p in normalize_pods(lines, ns)],
+    Supports the prefix grammar from the spec: ``pod:``, ``svc:``, ``cert:``,
+    ``gitops:``, ``pvc:``, ``finding:`` select a kind, ``ns:`` a namespace and
+    ``status:`` a state. Plain terms match case-insensitively against name and
+    namespace, so an exact Kubernetes name is never required.
+
+    Domains are queried concurrently and the engine's TTL cache de-duplicates
+    repeat work, so a re-typed query costs nothing.
+    """
+    terms, filters = _parse_search_query(q)
+
+    domains = (
+        ("workloads.resources", normalize_pods, "Pod", "/workloads/pods/{name}"),
+        ("network.topology", normalize_services, "Service", "/network?name={name}"),
+        ("pki.certificates", normalize_certificates, "Certificate", "/pki?name={name}"),
+        ("gitops.overview", normalize_gitops, "GitOps", "/gitops?name={name}"),
+        ("storage.dependencies", normalize_pvcs, "PVC", "/storage?name={name}"),
+        ("workloads.triage", normalize_findings, "Finding", "/findings?name={name}"),
     )
-    for pod in resources["envelope"]["data"] or []:
-        if needle in pod.get("name", "").lower():
-            results.append(
-                {
-                    "kind": "Pod",
-                    "name": pod["name"],
-                    "namespace": pod.get("namespace", ""),
-                    "route": f"/workloads/pods/{pod['name']}",
-                    "state": pod.get("status", "UNKNOWN"),
-                }
-            )
+    wanted = filters.get("kind")
+    selected = [d for d in domains if wanted is None or d[2] == wanted]
+
+    gathered = await asyncio.gather(
+        *(_search_domain(spec_id, norm, kind, route, sc) for spec_id, norm, kind, route in selected),
+        return_exceptions=True,
+    )
+
+    results: list[dict] = []
+    sources: list[str] = []
+    unavailable: list[str] = []
+    for entry, (_spec_id, _norm, kind, _route) in zip(gathered, selected, strict=True):
+        if isinstance(entry, BaseException):
+            unavailable.append(kind)
+            continue
+        rows, source = entry
+        sources.append(source)
+        results.extend(row for row in rows if _row_matches(row, terms, filters))
+
+    results.sort(key=lambda row: (row["kind"], row["name"]))
+    if "LIVE" in sources:
+        source = "LIVE"
+    elif sources:
+        source = sources[0]
+    else:
+        source = "UNAVAILABLE"
+
     return make_envelope(
-        {"query": q, "results": results[:200]},
+        {
+            "query": q,
+            "terms": terms,
+            "filters": filters,
+            "results": results[:200],
+            "total": len(results),
+            "searched": [kind for _s, _n, kind, _r in selected],
+            "unavailable": unavailable,
+        },
         context=sc.context,
         namespace=sc.namespace,
-        source=resources["envelope"]["source"],
+        source=source,
         status="OK" if results else "UNKNOWN",
+        warnings=[f"{kind} search was unavailable" for kind in unavailable],
     ).model_dump()
 
 

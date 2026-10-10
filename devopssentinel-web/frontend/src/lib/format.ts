@@ -79,5 +79,7 @@ export function formatBytes(bytes: number): string {
       return `${scaled.toFixed(suffixDigits(scaled))} ${suffix}`;
     }
   }
-  return `${value} B`;
+  // Tick interpolation produces values like 0.6699999999999999; keep byte counts
+  // readable without inventing precision the source never had.
+  return `${Number(value.toFixed(2))} B`;
 }

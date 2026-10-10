@@ -7,13 +7,13 @@ from fastapi import APIRouter, Depends, Query
 from ..models import make_envelope
 from ..security import validate_kind, validate_name
 from ..services.parsers import (
-    normalize_dependency_graph,
     normalize_events,
     normalize_logs,
     normalize_pods,
     normalize_workloads,
 )
 from .deps import Scope, invoke, scope
+from .graph import dependency_graph
 
 router = APIRouter(prefix="/api/v1", tags=["workloads"])
 
@@ -153,7 +153,7 @@ async def pod_dependencies(name: str, sc: Scope = Depends(scope)) -> dict:
         "graph.dependency",
         sc,
         params={"kind": "Pod", "name": name},
-        normalizer=lambda lines, ns: normalize_dependency_graph(lines).model_dump(),
+        normalizer=dependency_graph,
     )
 
 

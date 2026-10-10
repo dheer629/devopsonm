@@ -45,6 +45,9 @@
   --text-faint: #8494a9;
   --accent: #4c9aff;
   --accent-soft: #4c9aff26;
+  /* Text that sits on --accent. A light accent needs dark ink: white on this
+   * blue is 2.8:1, which fails WCAG AA for the primary button's 12.5px label. */
+  --accent-ink: #0b1220;
   --c-kubernetes: #22d3ee;
   --c-gitops: #a78bfa;
   --c-pki: #fbbf24;
@@ -73,6 +76,7 @@
   --text-faint: #7ba7c2;
   --accent: #38bdf8;
   --accent-soft: #38bdf826;
+  --accent-ink: #0b1220;
   --c-kubernetes: #67e8f9;
   --c-gitops: #c4b5fd;
   --c-pki: #fcd34d;
@@ -100,6 +104,7 @@
   --text-faint: #a3adc2;
   --accent: #88c0d0;
   --accent-soft: #88c0d026;
+  --accent-ink: #0b1220;
   --c-kubernetes: #8fbcbb;
   --c-gitops: #b48ead;
   --c-pki: #ebcb8b;
@@ -127,6 +132,7 @@
   --text-faint: #8b93bd;
   --accent: #7aa2f7;
   --accent-soft: #7aa2f726;
+  --accent-ink: #0b1220;
   --c-kubernetes: #7dcfff;
   --c-gitops: #bb9af7;
   --c-pki: #e0af68;
@@ -155,6 +161,7 @@
   --text-faint: #5c6878;
   --accent: #0b6bcb;
   --accent-soft: #0b6bcb1f;
+  --accent-ink: #ffffff;
   --c-kubernetes: #0e7490;
   --c-gitops: #6d28d9;
   --c-pki: #a16207;
@@ -182,6 +189,7 @@
   --text-faint: #557b86;
   --accent: #2077b4;
   --accent-soft: #2077b41f;
+  --accent-ink: #ffffff;
   --c-kubernetes: #2aa198;
   --c-gitops: #6c71c4;
   --c-pki: #b58900;
@@ -210,6 +218,7 @@
   --text-faint: #55637a;
   --accent: #2563eb;
   --accent-soft: #2563eb1f;
+  --accent-ink: #ffffff;
   --c-kubernetes: #0e7490;
   --c-gitops: #7c3aed;
   --c-pki: #b45309;
@@ -248,6 +257,7 @@
   --text-faint: #5f6b78;
   --accent: #2a5cc4;
   --accent-soft: #2a5cc41a;
+  --accent-ink: #ffffff;
   --chrome: #3f51b5;
   --chrome-text: #ffffff;
   --chrome-hover: #35439a;
@@ -279,6 +289,7 @@
   --color-text-faint: var(--text-faint);
   --color-accent: var(--accent);
   --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
   --color-chrome: var(--chrome);
   --color-chrome-text: var(--chrome-text);
   --color-chrome-hover: var(--chrome-hover);

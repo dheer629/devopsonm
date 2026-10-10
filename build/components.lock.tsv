@@ -1,0 +1,29 @@
+# DevOpsSentinel release component lock (sections 21, 37, 38, 65).
+#
+# Tab-separated. Columns:
+#   platform  name  version  license  url  archive  member  sha256  binary  status
+#
+# archive : raw | tar.gz | zip
+# member  : path inside the archive ("-" for raw downloads)
+# sha256  : upstream digest. "RECORD-ON-FETCH" means upstream publishes no clean
+#           digest; fetch-components.sh computes and records one for review and
+#           the component stays status=pending until a human confirms it.
+# status  : verified | pending | source-required
+#
+# Reproducibility (section 65): never substitute "latest". Bump a version here,
+# re-run build/fetch-components.sh, and commit the resulting digests.
+platform	name	version	license	url	archive	member	sha256	binary	status
+linux-amd64	kubectl	v1.31.4	Apache-2.0	https://dl.k8s.io/release/v1.31.4/bin/linux/amd64/kubectl	raw	-	298e19e9c6c17199011404278f0ff8168a7eca4217edad9097af577023a5620f	kubectl	verified
+linux-amd64	helm	v3.16.4	Apache-2.0	https://get.helm.sh/helm-v3.16.4-linux-amd64.tar.gz	tar.gz	linux-amd64/helm	fc307327959aa38ed8f9f7e66d45492bb022a66c3e5da6063958254b9767d179	helm	verified
+linux-amd64	flux	v2.4.0	Apache-2.0	https://github.com/fluxcd/flux2/releases/download/v2.4.0/flux_2.4.0_linux_amd64.tar.gz	tar.gz	flux	7b70b75af20e28fc30ee66cf5372ec8d51dd466fd2ee21aa42690984de70b09b	flux	verified
+linux-amd64	jq	jq-1.7.1	MIT	https://github.com/jqlang/jq/releases/download/jq-1.7.1/jq-linux-amd64	raw	-	5942c9b0934e510ee61eb3e30273f1b3fe2590df93933a93d7c58b81d19c8ff5	jq	verified
+linux-amd64	yq	v4.44.6	MIT	https://github.com/mikefarah/yq/releases/download/v4.44.6/yq_linux_amd64	raw	-	RECORD-ON-FETCH	yq	pending
+# The components below publish no official static Linux binary. Bundling them
+# means choosing a third-party build, which is a supply-chain decision the
+# operator must make explicitly (sections 25, 26, 38, 39). Until a source is
+# chosen the engine's fallback hierarchy (section 62) uses the host copy and
+# reports the capability as DEGRADED rather than failing.
+linux-amd64	openssl	3.0.15	Apache-2.0	SOURCE-REQUIRED	raw	-	RECORD-ON-FETCH	openssl	source-required
+linux-amd64	curl	8.11.0	curl	SOURCE-REQUIRED	raw	-	RECORD-ON-FETCH	curl	source-required
+linux-amd64	psql	17.2	PostgreSQL	SOURCE-REQUIRED	tar.gz	-	RECORD-ON-FETCH	psql	source-required
+linux-amd64	kcat	1.7.1	BSD-2-Clause	SOURCE-REQUIRED	tar.gz	-	RECORD-ON-FETCH	kcat	source-required

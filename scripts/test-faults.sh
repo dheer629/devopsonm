@@ -26,4 +26,4 @@ printf 'SENTINEL_E2E_CANARY_DO_NOT_EXPORT' > "$scratch/password"
 "${kube[@]}" create secret generic sentinel-canary --from-file=password="$scratch/password"
 "${kube[@]}" apply -f "$ROOT/tests/fixtures/faults.yaml"
 "${kube[@]}" wait --for=jsonpath='{.status.phase}'=Failed pod/sentinel-failed --timeout=60s
-python3 "$ROOT/tests/e2e.py" --context "$CONTEXT" --namespace "$NAMESPACE" --workload sentinel-demo --fault-fixtures
+python3 "$ROOT/tests/e2e.py" --context "$CONTEXT" --namespace "$NAMESPACE" --workload sentinel-platform --fault-fixtures

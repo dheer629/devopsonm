@@ -83,6 +83,24 @@ export interface Certificate {
   status: string;
   consumers: number;
   gitops: string;
+  serial: string;
+  fingerprint: string;
+  not_before: string;
+  san: string;
+  source: string;
+}
+
+export interface SecretRecord {
+  name: string;
+  namespace: string;
+  type: string;
+  created: string;
+  key_count: number;
+  keys: string;
+  is_tls: boolean;
+  expires: string;
+  days: number | null;
+  status: string;
 }
 
 export interface GitOpsObject {
@@ -217,6 +235,87 @@ export interface GraphEdge {
   target: string;
   label: string;
   confidence: string;
+  /** The engine report line this relationship was read from. */
+  evidence: string;
+}
+
+/** `/failure-path` — the unhealthy chain through a resource. */
+export interface FailurePath {
+  target: string;
+  graph: Graph;
+  unhealthy: string[];
+  /** Node id → the severity the engine's findings gave it. */
+  severity: Record<string, string>;
+  pathEdges: GraphEdge[];
+  /** Where the node health came from, e.g. "the engine's findings". */
+  healthSource: string;
+  note: string;
+}
+
+/** `/impact` and the `consumers` routes — reverse dependencies. */
+export interface ReverseDependencies {
+  target: string;
+  direct: string[];
+  count: number;
+  graph: Graph;
+  confidence: string;
+  selectingPolicies?: string[];
+  isolated?: boolean;
+  note?: string;
+}
+
+/** `/certificates/{name}/chain` */
+export interface CertificateChainLink {
+  subject: string;
+  issuer: string;
+  expiry: string;
+  days: number | null;
+  status: string;
+  serial: string;
+}
+
+export interface CertificateChain {
+  certificate: Certificate | null;
+  chain: CertificateChainLink[];
+  depth: number;
+  complete: boolean;
+  /** Why the walk stopped: root | cycle | not-in-inventory. */
+  terminated: string;
+  note: string;
+}
+
+/** `/storage/mount-warnings` */
+export interface MountWarnings {
+  warnings: PVCResource[];
+  unconsumed: PVCResource[];
+  total: number;
+}
+
+/** `/gitops/{kind}/{name}/timeline` */
+export interface GitOpsTimelineEntry {
+  at: string;
+  event: string;
+  revision: string;
+  status: string;
+  detail: string;
+}
+
+export interface GitOpsTimeline {
+  object: GitOpsObject | null;
+  entries: GitOpsTimelineEntry[];
+  lagging: boolean;
+  note: string;
+}
+
+/** `/network/dns/{service}` */
+export interface ServiceDns {
+  service: ServiceResource | null;
+  fqdn: string;
+  shortName: string;
+  expectedAddress: string;
+  readyEndpoints: number;
+  resolves: string;
+  note: string;
 }
 
 export interface Graph {
@@ -244,6 +343,8 @@ export interface LogLine {
   n: number;
   text: string;
   level: string;
+  /** RFC3339 timestamp when the capture used `--timestamps=true`. */
+  ts: string;
 }
 
 export interface LogBundle {
@@ -252,6 +353,29 @@ export interface LogBundle {
   previous: boolean;
   lines: LogLine[];
   patterns: { pattern: string; count: number }[];
+  /** Echo of the selected options, so the viewer states exactly what it read. */
+  since: string;
+  tail: number;
+  timestamps: boolean;
+  containers: string[];
+}
+
+export interface ResourceEvent {
+  time: string;
+  type: string;
+  reason: string;
+  object: string;
+  count: number;
+  message: string;
+}
+
+export interface ResourceDescription {
+  kind: string;
+  name: string;
+  namespace: string;
+  format: string;
+  content: string;
+  events: ResourceEvent[];
 }
 
 export interface OperationInfo {

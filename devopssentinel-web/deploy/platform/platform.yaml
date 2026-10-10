@@ -1,15 +1,15 @@
-# DevOpsSentinel Web -- demo fixtures.
+# DevOpsSentinel Web -- platform fixtures.
 #
-# Applied by scripts/demo-resources.sh (namespace supplied on the command line).
-# Everything carries `devopssentinel.io/demo: "true"` for one-command cleanup.
-# Images are pinned to what is already present in the demo vcluster.
+# Applied by scripts/platform-resources.sh (namespace supplied on the command line).
+# Everything carries `devopssentinel.io/platform: "true"` for one-command cleanup.
+# Images are pinned to what is already present in the local cluster.
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: demo-data
+  name: platform-data
   labels:
-    devopssentinel.io/demo: "true"
+    devopssentinel.io/platform: "true"
 spec:
   accessModes: ["ReadWriteOnce"]
   storageClassName: local-path
@@ -20,9 +20,9 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: demo-cache
+  name: platform-cache
   labels:
-    devopssentinel.io/demo: "true"
+    devopssentinel.io/platform: "true"
 spec:
   accessModes: ["ReadWriteOnce"]
   storageClassName: local-path
@@ -33,20 +33,20 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: demo-web
+  name: platform-web
   labels:
-    app: demo-web
-    devopssentinel.io/demo: "true"
+    app: platform-web
+    devopssentinel.io/platform: "true"
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: demo-web
+      app: platform-web
   template:
     metadata:
       labels:
-        app: demo-web
-        devopssentinel.io/demo: "true"
+        app: platform-web
+        devopssentinel.io/platform: "true"
     spec:
       automountServiceAccountToken: false
       containers:
@@ -70,22 +70,22 @@ spec:
       volumes:
         - name: data
           persistentVolumeClaim:
-            claimName: demo-data
+            claimName: platform-data
         - name: cache
           persistentVolumeClaim:
-            claimName: demo-cache
+            claimName: platform-cache
 ---
 apiVersion: v1
 kind: Service
 metadata:
-  name: demo-web
+  name: platform-web
   labels:
-    app: demo-web
-    devopssentinel.io/demo: "true"
+    app: platform-web
+    devopssentinel.io/platform: "true"
 spec:
   type: ClusterIP
   selector:
-    app: demo-web
+    app: platform-web
   ports:
     - name: http
       port: 9898
@@ -94,19 +94,19 @@ spec:
 apiVersion: v1
 kind: Secret
 metadata:
-  name: demo-postgres
+  name: platform-postgres
   labels:
-    devopssentinel.io/demo: "true"
+    devopssentinel.io/platform: "true"
 type: Opaque
 stringData:
-  password: demo-not-a-real-credential
+  password: platform-not-a-real-credential
 ---
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: demo-postgres-data
+  name: platform-postgres-data
   labels:
-    devopssentinel.io/demo: "true"
+    devopssentinel.io/platform: "true"
 spec:
   accessModes: ["ReadWriteOnce"]
   storageClassName: local-path
@@ -117,20 +117,20 @@ spec:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: demo-postgres
+  name: platform-postgres
   labels:
-    app: demo-postgres
-    devopssentinel.io/demo: "true"
+    app: platform-postgres
+    devopssentinel.io/platform: "true"
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: demo-postgres
+      app: platform-postgres
   template:
     metadata:
       labels:
-        app: demo-postgres
-        devopssentinel.io/demo: "true"
+        app: platform-postgres
+        devopssentinel.io/platform: "true"
     spec:
       automountServiceAccountToken: false
       containers:
@@ -142,19 +142,19 @@ spec:
               containerPort: 5432
           env:
             - name: POSTGRES_DB
-              value: demo
+              value: platform
             - name: POSTGRES_USER
-              value: demo
+              value: platform
             - name: PGDATA
               value: /var/lib/postgresql/data/pgdata
             - name: POSTGRES_PASSWORD
               valueFrom:
                 secretKeyRef:
-                  name: demo-postgres
+                  name: platform-postgres
                   key: password
           readinessProbe:
             exec:
-              command: ["pg_isready", "-U", "demo"]
+              command: ["pg_isready", "-U", "platform"]
             initialDelaySeconds: 5
             periodSeconds: 10
           resources:
@@ -172,19 +172,19 @@ spec:
         # which is exactly what made the SQL console look empty.
         - name: data
           persistentVolumeClaim:
-            claimName: demo-postgres-data
+            claimName: platform-postgres-data
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: postgres
   labels:
-    app: demo-postgres
-    devopssentinel.io/demo: "true"
+    app: platform-postgres
+    devopssentinel.io/platform: "true"
 spec:
   type: ClusterIP
   selector:
-    app: demo-postgres
+    app: platform-postgres
   ports:
     - name: postgres
       port: 5432
@@ -193,9 +193,9 @@ spec:
 apiVersion: v1
 kind: PersistentVolumeClaim
 metadata:
-  name: demo-kafka-data
+  name: platform-kafka-data
   labels:
-    devopssentinel.io/demo: "true"
+    devopssentinel.io/platform: "true"
 spec:
   accessModes: ["ReadWriteOnce"]
   storageClassName: local-path
@@ -206,15 +206,15 @@ spec:
 # Kafka discovery reads Service metadata, and the opt-in Topics view needs a
 # real broker. This is a single-node KRaft broker (the same shape the
 # devopssentinel-e2e harness uses). `advertised.listeners` is rendered by
-# scripts/demo-resources.sh with the cluster node IP so both in-cluster and
+# scripts/platform-resources.sh with the cluster node IP so both in-cluster and
 # NodePort clients can reach it. Logs live on a PVC so topics and offsets
 # survive a pod or cluster restart.
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: demo-kafka-config
+  name: platform-kafka-config
   labels:
-    devopssentinel.io/demo: "true"
+    devopssentinel.io/platform: "true"
 data:
   server.properties: |
     process.roles=broker,controller
@@ -238,22 +238,22 @@ data:
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: demo-kafka
+  name: platform-kafka
   labels:
-    app: demo-kafka
-    devopssentinel.io/demo: "true"
+    app: platform-kafka
+    devopssentinel.io/platform: "true"
 spec:
   replicas: 1
   strategy:
     type: Recreate
   selector:
     matchLabels:
-      app: demo-kafka
+      app: platform-kafka
   template:
     metadata:
       labels:
-        app: demo-kafka
-        devopssentinel.io/demo: "true"
+        app: platform-kafka
+        devopssentinel.io/platform: "true"
     spec:
       automountServiceAccountToken: false
       securityContext:
@@ -271,12 +271,12 @@ spec:
               # existing meta.properties (and would drop every topic), so with a
               # PersistentVolume we must reuse whatever is already there.
               if [ ! -f /var/lib/kafka/data/meta.properties ]; then
-                echo "demo-kafka: formatting a new KRaft storage directory"
+                echo "platform-kafka: formatting a new KRaft storage directory"
                 /opt/kafka/bin/kafka-storage.sh format \
                   -t "$(/opt/kafka/bin/kafka-storage.sh random-uuid)" \
                   -c /fixture/server.properties
               else
-                echo "demo-kafka: reusing the existing KRaft storage directory"
+                echo "platform-kafka: reusing the existing KRaft storage directory"
               fi
               exec /opt/kafka/bin/kafka-server-start.sh /fixture/server.properties
           env:
@@ -308,40 +308,40 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: demo-kafka-config
+            name: platform-kafka-config
         - name: data
           persistentVolumeClaim:
-            claimName: demo-kafka-data
+            claimName: platform-kafka-data
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: kafka
   labels:
-    app: demo-kafka
-    devopssentinel.io/demo: "true"
+    app: platform-kafka
+    devopssentinel.io/platform: "true"
 spec:
   type: ClusterIP
   selector:
-    app: demo-kafka
+    app: platform-kafka
   ports:
     - name: kafka
       port: 9092
       targetPort: 9092
 ---
-# NodePorts so the local adapter (and the engine console) can reach the demo
+# NodePorts so the local adapter (and the engine console) can reach the platform
 # data services from WSL. 30432 -> PostgreSQL, 30092 -> Kafka.
 apiVersion: v1
 kind: Service
 metadata:
   name: postgres-nodeport
   labels:
-    app: demo-postgres
-    devopssentinel.io/demo: "true"
+    app: platform-postgres
+    devopssentinel.io/platform: "true"
 spec:
   type: NodePort
   selector:
-    app: demo-postgres
+    app: platform-postgres
   ports:
     - name: postgres
       port: 5432
@@ -353,12 +353,12 @@ kind: Service
 metadata:
   name: kafka-nodeport
   labels:
-    app: demo-kafka
-    devopssentinel.io/demo: "true"
+    app: platform-kafka
+    devopssentinel.io/platform: "true"
 spec:
   type: NodePort
   selector:
-    app: demo-kafka
+    app: platform-kafka
   ports:
     - name: kafka
       port: 9092

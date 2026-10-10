@@ -8,3 +8,8 @@ __pycache__/
 *.kubeconfig
 evidence/
 test-results/
+
+# Release build: downloaded components and produced artifacts are regenerable
+# from build/components.lock.tsv and must never be committed.
+build/cache/
+build/out/

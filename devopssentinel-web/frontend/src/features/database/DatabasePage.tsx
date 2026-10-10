@@ -148,16 +148,30 @@ export function DatabasePage() {
           <Metric label="Ready endpoints" value={`${ready} / ${rows.length}`} />
           <Metric label="psql client" value={psql ? "AVAILABLE" : "NOT INSTALLED"} />
           <Metric label="SQL console" value={consoleEnabled ? "ENABLED" : "DISABLED"} />
-          <Metric label="Row-level data" value={consoleEnabled ? "SQL TAB" : "CLI ONLY"} />
+          <Metric
+            label="Row-level data"
+            value={consoleEnabled ? "SQL TAB" : psql ? "CLI ONLY" : "UNAVAILABLE"}
+          />
           <p className="text-[11.5px] text-text-muted sm:col-span-2 lg:col-span-5">
-            Use the <span className="mono">SQL</span> tab for a read-only session (opt-in with{" "}
-            <span className="mono">DSWEB_ENABLE_SQL_CONSOLE=1</span>; credentials are used for one
-            request and never stored). Otherwise run{" "}
+            Use the <span className="mono">SQL</span> tab for a read-only session — turn it on with
+            the <span className="mono">Read-only SQL console</span> switch in Settings (or{" "}
+            <span className="mono">DSWEB_ENABLE_SQL_CONSOLE=1</span> at start-up); it applies
+            immediately, and credentials are used for one request and never stored. The engine's own
+            path is{" "}
             <span className="mono">
               bash DevOps_K8s_Sentinel_FINAL_GP.sh --context {scope.context || "&lt;ctx&gt;"}{" "}
               --namespace {scope.namespace || "&lt;ns&gt;"}
             </span>{" "}
-            and choose <span className="mono">PostgreSQL / generic DB → read-only checks</span>.
+            → <span className="mono">PostgreSQL / generic DB → read-only checks</span>
+            {psql ? (
+              "."
+            ) : (
+              <>
+                , which needs the <span className="mono">psql</span> client on the server — it is not
+                installed here, so row-level reads are unavailable until either the console is turned
+                on or <span className="mono">psql</span> is added to the image.
+              </>
+            )}
           </p>
         </CardBody>
       </Card>

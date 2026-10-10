@@ -50,14 +50,14 @@ check grep -q 'PV: UNBOUND' "$RUN_DIR/storage.txt"
 collect_network() { :; }
 collect_workloads() { :; }
 deployment_chain_report() { :; }
-printf '%s\n' '{"items":[{"metadata":{"name":"standalone"},"spec":{},"status":{}},{"metadata":{"name":"app-pod","labels":{"app":"demo"},"ownerReferences":[{"kind":"ReplicaSet","name":"demo-rs","controller":true}]},"spec":{"containers":[{"name":"app","image":"test"}]},"status":{"phase":"Running"}}]}' > "$CACHE_DIR/pods.json"
-printf '%s\n' '{"items":[{"kind":"ReplicaSet","metadata":{"name":"demo-rs","ownerReferences":[{"kind":"Deployment","name":"demo","controller":true}]}}]}' > "$CACHE_DIR/workloads.json"
-printf '%s\n' '{"items":[{"metadata":{"name":"demo-svc"},"spec":{"selector":{"app":"demo"}}}]}' > "$CACHE_DIR/services.json"
+printf '%s\n' '{"items":[{"metadata":{"name":"standalone"},"spec":{},"status":{}},{"metadata":{"name":"app-pod","labels":{"app":"platform"},"ownerReferences":[{"kind":"ReplicaSet","name":"platform-rs","controller":true}]},"spec":{"containers":[{"name":"app","image":"test"}]},"status":{"phase":"Running"}}]}' > "$CACHE_DIR/pods.json"
+printf '%s\n' '{"items":[{"kind":"ReplicaSet","metadata":{"name":"platform-rs","ownerReferences":[{"kind":"Deployment","name":"platform","controller":true}]}}]}' > "$CACHE_DIR/workloads.json"
+printf '%s\n' '{"items":[{"metadata":{"name":"platform-svc"},"spec":{"selector":{"app":"platform"}}}]}' > "$CACHE_DIR/services.json"
 for key in pods workloads services; do cache_record "$key" OK; done
-for target in Deployment/demo ReplicaSet/demo-rs; do
+for target in Deployment/platform ReplicaSet/platform-rs; do
     resource_dependencies "${target%/*}" fixture "${target#*/}" > "$RUN_DIR/dependency.txt" 2>&1; rc=$?
     check test "$rc" -eq 0
-    check grep -q 'Service: demo-svc' "$RUN_DIR/dependency.txt"
+    check grep -q 'Service: platform-svc' "$RUN_DIR/dependency.txt"
     check grep -q 'Pod: app-pod' "$RUN_DIR/dependency.txt"
     if grep -q 'jq: error' "$RUN_DIR/dependency.txt"; then fail=1; fi
 done

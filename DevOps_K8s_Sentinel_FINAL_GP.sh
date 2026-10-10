@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# DevOpsSentinel -- final single-file, read-only Kubernetes + GitOps + PKI/TLS + ETDP operations console.
+# DevOpsSentinel -- final single-file, read-only Kubernetes + GitOps + PKI/TLS + application profile console.
 # Runtime files are private, local, sanitized projections, never kubeconfig copies.
 # No Git publishing, Flux reconciliation, Helm mutation, or Kubernetes mutation exists in this build.
 # Changelog (compact):
@@ -43,7 +43,121 @@ declare -a ACTIVE_PIDS=()
 declare -A DEPENDENCIES=()
 C_RESET= C_GREEN= C_YELLOW= C_RED= C_CYAN= C_BLUE= C_DIM=
 
-# 02 Terminal and input primitives
+# 02 Bundled toolchain registry (sections 15-17, 21-24, 35-37, 45-46, 71-74).
+#
+# A release build embeds validated binaries beneath $SNTL_HOME/bin. The registry
+# resolves each critical component ONCE per session and prefers the bundled copy,
+# so behaviour is deterministic and startup needs neither the internet nor any
+# host package. Resolution never writes outside $HOME and never requires sudo.
+#
+#   DEVOPSSENTINEL_USE_SYSTEM_TOOLS=1   prefer host tools over the bundle
+#
+# Each component records ORIGIN (BUNDLED|SYSTEM|NONE) and STATE
+# (OK|UNAVAILABLE|INCOMPATIBLE|CORRUPT) so --doctor can classify it instead of
+# reporting a bare installed/not-installed, and a tampered bundle is refused.
+SNTL_TOOL_NAMES=(kubectl helm flux jq yq openssl curl psql kcat)
+SNTL_TOOLCHAIN_READY=0
+DEVOPSSENTINEL_USE_SYSTEM_TOOLS="${DEVOPSSENTINEL_USE_SYSTEM_TOOLS:-0}"
+declare -A SNTL_TOOL_PATH=() SNTL_TOOL_ORIGIN=() SNTL_TOOL_STATE=() SNTL_TOOL_VERSION=()
+declare -A SNTL_COMPONENT_SHA=() SNTL_COMPONENT_LICENSE=() SNTL_COMPONENT_SOURCE=()
+
+sntl_bin_dir() { printf '%s/bin' "${SNTL_HOME:-${OUTPUT_DIR:-${HOME}/.devopssentinel}}"; }
+
+# Candidate argv[0] names for one logical component (kcat ships as kcat or kafkacat).
+sntl_candidates() {
+    case $1 in
+        kcat) printf '%s\n' kcat kafkacat;;
+        *) printf '%s\n' "$1";;
+    esac
+}
+
+sntl_sha256_file() {
+    local file=$1
+    if has sha256sum; then sha256sum -- "$file" | awk '{print $1}'
+    elif has shasum; then shasum -a 256 -- "$file" | awk '{print $1}'
+    elif has openssl; then openssl dgst -sha256 -- "$file" | awk '{print $NF}'
+    else return 1; fi
+}
+
+# Manifest lives beside the extracted binaries: <bin>/components.tsv.
+# Line format: COMPONENT<TAB>VERSION<TAB>SHA256<TAB>LICENSE<TAB>SOURCE
+sntl_manifest_load() {
+    local manifest="$1/components.tsv" name version sha license source
+    [[ -r $manifest ]] || return 0
+    while IFS=$'\t' read -r name version sha license source; do
+        [[ -n $name && $name != \#* ]] || continue
+        SNTL_COMPONENT_SHA[$name]=$sha
+        SNTL_COMPONENT_LICENSE[$name]=$license
+        SNTL_COMPONENT_SOURCE[$name]=$source
+        SNTL_TOOL_VERSION[$name]=$version
+    done < "$manifest"
+    return 0
+}
+
+# Resolve one component. The bundled copy wins unless the operator opts out;
+# a corrupt bundle is reported, never silently replaced by an unverified binary.
+sntl_resolve_tool() {
+    local name=$1 cand path expected actual
+    SNTL_TOOL_PATH[$name]= SNTL_TOOL_ORIGIN[$name]=NONE SNTL_TOOL_STATE[$name]=UNAVAILABLE
+
+    if [[ $DEVOPSSENTINEL_USE_SYSTEM_TOOLS != 1 ]]; then
+        while IFS= read -r cand; do
+            path="${SNTL_BIN_DIR:-}/$cand"
+            [[ -f $path && -x $path ]] || continue
+            expected=${SNTL_COMPONENT_SHA[$name]:-}
+            if [[ -n $expected ]]; then
+                actual=$(sntl_sha256_file "$path") || actual=
+                if [[ -z $actual ]]; then
+                    SNTL_TOOL_STATE[$name]=INCOMPATIBLE
+                    continue
+                fi
+                if [[ $actual != "$expected" ]]; then
+                    SNTL_TOOL_STATE[$name]=CORRUPT
+                    continue
+                fi
+            fi
+            SNTL_TOOL_PATH[$name]=$path SNTL_TOOL_ORIGIN[$name]=BUNDLED SNTL_TOOL_STATE[$name]=OK
+            return 0
+        done < <(sntl_candidates "$name")
+        [[ ${SNTL_TOOL_STATE[$name]} == CORRUPT ]] && return 0
+    fi
+
+    while IFS= read -r cand; do
+        path=$(command -v "$cand" 2>/dev/null) || path=
+        [[ -n $path ]] || continue
+        SNTL_TOOL_PATH[$name]=$path SNTL_TOOL_ORIGIN[$name]=SYSTEM SNTL_TOOL_STATE[$name]=OK
+        return 0
+    done < <(sntl_candidates "$name")
+    return 0
+}
+
+sntl_toolchain_init() {
+    local name dir
+    dir=$(sntl_bin_dir)
+    SNTL_BIN_DIR=$dir
+    SNTL_TOOL_PATH=() SNTL_TOOL_ORIGIN=() SNTL_TOOL_STATE=()
+    sntl_manifest_load "$dir"
+    if [[ -d $dir ]]; then
+        # Process-local PATH only: bundled tools win for every bare invocation.
+        # Nothing is written to a profile, PATH is never changed globally, and
+        # no sudo is involved (sections 16-17, 72).
+        case ":$PATH:" in
+            *":$dir:"*) ;;
+            *) PATH="$dir:$PATH"; export PATH;;
+        esac
+        chmod 700 -- "$dir" 2>/dev/null || :
+        chmod go-w -- "$dir"/* 2>/dev/null || :
+    fi
+    for name in "${SNTL_TOOL_NAMES[@]}"; do sntl_resolve_tool "$name"; done
+    SNTL_TOOLCHAIN_READY=1
+    return 0
+}
+
+# Central accessor (section 73): never scatter binary lookup logic.
+sntl_tool() { printf '%s' "${SNTL_TOOL_PATH[$1]:-}"; }
+sntl_tool_usable() { [[ ${SNTL_TOOL_STATE[$1]:-} == OK && -n ${SNTL_TOOL_PATH[$1]:-} ]]; }
+
+# 03 Terminal and input primitives
 has() { command -v "$1" >/dev/null 2>&1; }
 now_epoch() { printf '%(%s)T\n' -1; }
 timestamp() { TZ=UTC printf '%(%Y-%m-%dT%H:%M:%SZ)T\n' -1; }
@@ -3257,6 +3371,8 @@ init_runtime() {
     SNTL_LOG_DIR="$root/logs"
     mkdir -p -- "$SNTL_CACHE_ROOT" "$SNTL_RUNTIME_DIR" "$SNTL_EXPORT_DIR" "$SNTL_EVIDENCE_DIR" \
         "$SNTL_HISTORY_DIR" "$SNTL_REPORT_DIR" "$SNTL_BACKUP_DIR" "$SNTL_LOG_DIR" || return 2
+    # Resolve the bundled/system toolchain once the runtime root exists (sections 15-17).
+    sntl_toolchain_init || :
     chmod 700 -- "$root" "$SNTL_CACHE_ROOT" "$SNTL_RUNTIME_DIR" "$SNTL_EXPORT_DIR" "$SNTL_EVIDENCE_DIR" \
         "$SNTL_HISTORY_DIR" "$SNTL_REPORT_DIR" "$SNTL_BACKUP_DIR" "$SNTL_LOG_DIR" 2>/dev/null || :
     chmod g-s -- "$root" "$SNTL_CACHE_ROOT" "$SNTL_RUNTIME_DIR" "$SNTL_EXPORT_DIR" "$SNTL_EVIDENCE_DIR" \
@@ -3401,7 +3517,7 @@ evidence_create() {
 }
 
 # ==============================================================================
-# Resource, dependency, GitOps, certificate, network, storage and ETDP engines.
+# Resource, dependency, GitOps, certificate, network, storage and application-profile engines.
 # ==============================================================================
 
 resource_catalog() {
@@ -4213,42 +4329,45 @@ kafka_menu() {
 }
 
 # ==============================================================================
-# ETDP-aware inspector. Generic labels/patterns are used and no cluster writes.
+# Application-profile inspector. Discovery uses generic evidence (image, port,
+# CRD and label patterns); names alone never decide. No cluster writes.
 # ==============================================================================
 
-etdp_platform_report() {
+application_profile_report() {
     collect_pods; collect_workloads; collect_network; gitops_collect
-    render_header 'ETDP PLATFORM INSPECTOR'
-    printf 'ETDP DETECTION: %s\n' "$( [[ ${SENTINEL_NAMESPACE,,} == *etdp* || ${SENTINEL_NAMESPACE,,} == *ecev* ]] && printf LIKELY || printf GENERIC_CLUSTER_MODE )"
-    if ! has jq; then printf 'jq unavailable; ETDP categorization degraded.\n'; return; fi
+    render_header 'PLATFORM & APPLICATION INSPECTOR'
+    printf 'CLASSIFICATION: evidence-based (image/port/CRD/label). Names alone never decide.\n'
+    if ! has jq; then printf 'jq unavailable; application categorization degraded.\n'; return; fi
     local pods; pods=$(json_cache_path pods)
     printf '\nCATEGORY\tPODS\tNOT RUNNING\tRESTARTS\n'
     while IFS='|' read -r category regex; do
         jq -r --arg c "$category" --arg r "$regex" '[.items[]|select(.metadata.name|test($r;"i"))] as $x | [$c,($x|length),([$x[]|select(.status.phase!="Running")]|length),([$x[].status.containerStatuses[]?.restartCount//0]|add//0)]|@tsv' "$pods"
-    done <<'ETDPCATS'
-Mediation / Application|eric-bss-em|mediation|online|manager
-Generic DB|genericdb|postgres
-Kafka|kafka
-Log Transformer|transformer|log-transformer
-Alarms / Fault|alarm|fault|fh-
-Syslog / Logging|syslog|logship|filebeat
-IAM / Identity|iam|keycloak|dex|oidc
-KMS / Security|kms|key-management
-Reporter / PM|reporter|pm-|prometheus|metrics
-CNOM|cnom
-Notification / File Server|fileserver|notification|file-mediation|sftp
-Backup|backup|bragent|bro
-ETDPCATS
+    done <<'APPCATS'
+Web / API|api|gateway|proxy|frontend|backend|web|http
+Database|postgres|mysql|mariadb|mongo|cockroach|pgbouncer|sql
+Message Broker|kafka|rabbit|nats|pulsar|zookeeper|redpanda
+Logging / Observability|fluent|filebeat|logstash|prometheus|grafana|otel|collector|vector
+Authentication / Identity|keycloak|dex|oidc|oauth|auth|iam
+Certificate Management|cert-manager|vault|step-ca|trust-manager
+Ingress / Gateway|ingress|nginx|traefik|envoy|istio|kong|haproxy
+Storage|ceph|longhorn|rook|minio|nfs|csi
+Cache|redis|memcached|valkey
+Scheduler / Batch|batch|scheduler|worker|cron
+Operator / Controller|operator|controller|manager
+File Processing|sftp|ftp|transfer|file-mediation
+Alarms / Events|alarm|alert|event|notify
+Backup|backup|velero|restic
+APPCATS
     printf '\nGENERIC DB\n'; pg_discover_report 2>/dev/null || :
     printf '\nKAFKA\n'; kafka_discovery_report 2>/dev/null || :
     printf '\nGITOPS\n'; gitops_revision_report 2>/dev/null || :
     printf '\nCERTIFICATE HEALTH\n'; certificate_health_summary 2>/dev/null || :
 }
 
-etdp_menu() {
-    while choose 'ETDP PLATFORM OPERATIONS' 'Platform overview' 'Generic DB' 'Kafka' 'GitOps' 'Certificates / TLS' 'Storage' 'Network' 'Event radar' 'Back'; do
+application_profile_menu() {
+    while choose 'APPLICATION PROFILE OPERATIONS' 'Platform overview' 'Generic DB' 'Kafka' 'GitOps' 'Certificates / TLS' 'Storage' 'Network' 'Event radar' 'Back'; do
         case $REPLY in
-            'Platform overview') show_report 'ETDP Platform' etdp_platform_report;;
+            'Platform overview') show_report 'Application Profile' application_profile_report;;
             'Generic DB') postgres_menu;; 'Kafka') kafka_menu;; 'GitOps') gitops_menu;;
             'Certificates / TLS') certificates_menu;; 'Storage') show_report 'Storage dependencies' storage_dependency_report;;
             'Network') show_report 'Service topology' service_topology_report;; 'Event radar') show_report 'Event Radar' events_report all;;
@@ -4310,6 +4429,178 @@ bootstrap_scope() {
     return 0
 }
 
+# ==============================================================================
+# Bundled toolchain reporting (sections 20-22, 36, 39, 46, 87).
+# ==============================================================================
+
+sntl_component_rows() {
+    local name
+    for name in "${SNTL_TOOL_NAMES[@]}"; do
+        printf '%s\t%s\t%s\t%s\t%s\n' "$name" "${SNTL_TOOL_ORIGIN[$name]:-NONE}" \
+            "${SNTL_TOOL_STATE[$name]:-UNAVAILABLE}" "${SNTL_TOOL_VERSION[$name]:-UNKNOWN}" \
+            "${SNTL_TOOL_PATH[$name]:-}"
+    done
+}
+
+sntl_bundled_ok() { [[ ${SNTL_TOOL_ORIGIN[$1]:-} == BUNDLED && ${SNTL_TOOL_STATE[$1]:-} == OK ]]; }
+
+# FEATURE / ENGINE / BUNDLED matrix (section 87).
+sntl_feature_matrix() {
+    local -a rows=(
+        'Kubernetes inventory|kubectl'
+        'JSON parsing|jq'
+        'YAML parsing|yq'
+        'Certificate parsing|openssl'
+        'HTTP/TLS diagnostics|curl'
+        'Helm inspection|helm'
+        'Flux CLI inspection|flux'
+        'PostgreSQL|psql'
+        'Kafka / messaging|kcat'
+    )
+    local row feature engine verdict
+    for row in "${rows[@]}"; do
+        feature=${row%%|*}; engine=${row##*|}
+        if sntl_bundled_ok "$engine"; then verdict=YES
+        elif sntl_tool_usable "$engine"; then verdict='NO (system tool)'
+        else verdict='NO (missing)'; fi
+        printf '%-26s %-16s %s\n' "$feature" "$engine" "$verdict"
+    done
+}
+
+sntl_platform() {
+    local os arch
+    os=$(uname -s 2>/dev/null || printf unknown)
+    arch=$(uname -m 2>/dev/null || printf unknown)
+    case $arch in x86_64|amd64) arch=amd64;; aarch64|arm64) arch=arm64;; esac
+    printf '%s-%s' "${os,,}" "$arch"
+}
+
+components_report() {
+    local name origin state version path manifest="${SNTL_HOME:-}/bin/components.tsv"
+    render_header 'BUNDLED RUNTIME COMPONENTS'
+    render_kv 'Application' "$APP_NAME $APP_VERSION ($APP_BUILD)"
+    render_kv 'Bundle root' "${SNTL_HOME:-UNSET}/bin"
+    if [[ -r $manifest ]]; then render_kv 'Manifest' "$manifest"
+    else render_kv 'Manifest' 'ABSENT (system-tool mode)'; fi
+    if [[ $DEVOPSSENTINEL_USE_SYSTEM_TOOLS == 1 ]]; then
+        render_kv 'Preference' 'SYSTEM TOOLS (operator override)'
+    else render_kv 'Preference' 'BUNDLED FIRST'; fi
+    render_section 'COMPONENTS'
+    printf '%-10s %-10s %-13s %-12s %s\n' COMPONENT ORIGIN STATE VERSION PATH
+    while IFS=$'\t' read -r name origin state version path; do
+        printf '%-10s %-10s %-13s %-12s %s\n' "$name" "$origin" "$state" "$version" "${path:-—}"
+    done < <(sntl_component_rows)
+    render_section 'FEATURE DEPENDENCY MATRIX'
+    printf '%-26s %-16s %s\n' FEATURE ENGINE BUNDLED
+    sntl_feature_matrix
+    render_section 'INTERPRETATION'
+    printf 'BUNDLED   the validated copy shipped with this release is in use.\n'
+    printf 'SYSTEM    the operator opted out, or the component is absent from the bundle.\n'
+    printf 'CORRUPT / INCOMPATIBLE components are refused and never executed.\n'
+    return 0
+}
+
+licenses_report() {
+    local name
+    render_header 'BUNDLED COMPONENT LICENSES'
+    render_kv 'Application' "$APP_NAME $APP_VERSION"
+    render_kv 'Manifest' "${SNTL_HOME:-}/bin/components.tsv"
+    render_section 'LICENSES'
+    printf '%-10s %-12s %-24s %s\n' COMPONENT VERSION LICENSE SOURCE
+    for name in "${SNTL_TOOL_NAMES[@]}"; do
+        printf '%-10s %-12s %-24s %s\n' "$name" "${SNTL_TOOL_VERSION[$name]:-UNKNOWN}" \
+            "${SNTL_COMPONENT_LICENSE[$name]:-UNKNOWN}" "${SNTL_COMPONENT_SOURCE[$name]:-—}"
+    done
+    printf '\nOnly permissively licensed components are redistributed; see docs/THIRD_PARTY_LICENSES.md.\n'
+    return 0
+}
+
+offline_check_report() {
+    local name origin state verdict failed=0 degraded=0 platform
+    platform=$(sntl_platform)
+    render_header 'OFFLINE READINESS CHECK'
+    render_kv 'Application' "$APP_NAME $APP_VERSION ($APP_BUILD)"
+    render_kv 'Platform' "$platform"
+    render_kv 'Supported' 'linux-amd64, linux-arm64'
+    render_section 'PAYLOAD'
+    if [[ -r ${SNTL_HOME:-}/bin/components.tsv ]]; then
+        printf '%-24s %s\n' 'Embedded payload' AVAILABLE
+    else printf '%-24s %s\n' 'Embedded payload' 'ABSENT (system-tool mode)'; fi
+    render_section 'COMPONENTS'
+    printf '%-10s %-10s %-13s %s\n' COMPONENT ORIGIN STATE RESULT
+    for name in "${SNTL_TOOL_NAMES[@]}"; do
+        state=${SNTL_TOOL_STATE[$name]:-UNAVAILABLE}; origin=${SNTL_TOOL_ORIGIN[$name]:-NONE}
+        case $state in
+            # Only an integrity problem is a failure. An absent or host-provided
+            # component is degraded, which sections 61-62 explicitly permit: one
+            # missing tool must not disable the unrelated modules.
+            CORRUPT) verdict='FAIL integrity'; failed=1;;
+            INCOMPATIBLE) verdict='FAIL unverifiable'; failed=1;;
+            OK) if [[ $origin == BUNDLED ]]; then verdict=PASS
+                else verdict='DEGRADED (host tool)'; degraded=$((degraded + 1)); fi;;
+            *) verdict='DEGRADED (unavailable)'; degraded=$((degraded + 1));;
+        esac
+        printf '%-10s %-10s %-13s %s\n' "$name" "$origin" "$state" "$verdict"
+    done
+    render_section 'RESULT'
+    printf 'No network access is required to start the utility or to run bundled components.\n'
+    ((degraded == 0)) || printf 'DEGRADED: %s component(s) not provided by the bundle.\n' "$degraded"
+    ((failed == 0)) || { printf 'OFFLINE CHECK: FAIL\n'; return 1; }
+    printf 'OFFLINE CHECK: PASS\n'
+    return 0
+}
+
+verify_bundle_report() {
+    local name expected actual failed=0 mode
+    render_header 'BUNDLE INTEGRITY VERIFICATION'
+    render_kv 'Application' "$APP_NAME $APP_VERSION ($APP_BUILD)"
+    render_kv 'Executable' "$SOURCE_FILE"
+    render_section 'MAIN EXECUTABLE'
+    if [[ -r $SOURCE_FILE ]]; then
+        mode=$(stat -c '%a' "$SOURCE_FILE" 2>/dev/null || printf unknown)
+        printf '%-12s %s\n' 'Digest' "$(sntl_sha256_file "$SOURCE_FILE" || printf UNKNOWN)"
+        printf '%-12s %s\n' 'Mode' "$mode"
+        [[ $mode == *[1357] ]] || { printf '%-12s %s\n' 'Permissions' 'WARN group/world writable'; }
+    else printf '%-12s %s\n' 'Digest' UNREADABLE; failed=1; fi
+    render_section 'EXTRACTED COMPONENTS'
+    for name in "${SNTL_TOOL_NAMES[@]}"; do
+        # A refused component is never selected, so check integrity state first:
+        # a CORRUPT/INCOMPATIBLE bundle must fail verification (sections 22, 46, 78).
+        case ${SNTL_TOOL_STATE[$name]:-UNAVAILABLE} in
+            CORRUPT) printf '%-10s %-13s %s\n' "$name" CORRUPT 'integrity failure'; failed=1; continue;;
+            INCOMPATIBLE) printf '%-10s %-13s %s\n' "$name" INCOMPATIBLE 'digest unverifiable'; failed=1; continue;;
+        esac
+        if [[ ${SNTL_TOOL_ORIGIN[$name]:-} != BUNDLED ]]; then
+            printf '%-10s %-13s %s\n' "$name" "${SNTL_TOOL_STATE[$name]:-UNAVAILABLE}" 'not bundled'
+            continue
+        fi
+        expected=${SNTL_COMPONENT_SHA[$name]:-}
+        actual=$(sntl_sha256_file "${SNTL_TOOL_PATH[$name]}") || actual=
+        if [[ -z $expected ]]; then
+            printf '%-10s %-13s %s\n' "$name" UNVERIFIED 'no manifest digest'; failed=1
+        elif [[ $actual == "$expected" ]]; then
+            printf '%-10s %-13s %s\n' "$name" OK "$actual"
+        else printf '%-10s %-13s %s\n' "$name" CORRUPT "$actual"; failed=1; fi
+    done
+    render_section 'RESULT'
+    ((failed==0)) || { printf 'VERIFY: FAIL\n'; return 1; }
+    printf 'VERIFY: PASS\n'
+    return 0
+}
+
+checksum_report() {
+    render_header 'CHECKSUMS'
+    render_kv 'Application' "$APP_NAME $APP_VERSION ($APP_BUILD)"
+    printf 'EXECUTABLE\t%s\t%s\n' "$SOURCE_FILE" "$(sntl_sha256_file "$SOURCE_FILE" || printf UNKNOWN)"
+    printf 'MANIFEST\t%s/bin/components.tsv\t%s\n' "${SNTL_HOME:-}" \
+        "$([[ -r ${SNTL_HOME:-}/bin/components.tsv ]] && sntl_sha256_file "${SNTL_HOME}/bin/components.tsv" || printf ABSENT)"
+    printf 'COMPONENT\tVERSION\tSHA256\n'
+    while IFS=$'\t' read -r name origin state version path; do
+        printf '%s\t%s\t%s\n' "$name" "$version" "${SNTL_COMPONENT_SHA[$name]:-ABSENT}"
+    done < <(sntl_component_rows)
+    return 0
+}
+
 devopssentinel_doctor_report() {
     render_header 'ENVIRONMENT DOCTOR'
     render_kv 'Application' "$APP_NAME $APP_VERSION ($APP_BUILD)"
@@ -4326,6 +4617,12 @@ devopssentinel_doctor_report() {
     render_section 'TOOLING'
     local cmd
     for cmd in kubectl jq openssl helm flux curl psql kafka-topics.sh kafka-topics kafka-consumer-groups.sh kafka-consumer-groups ip ss timeout sha256sum; do printf '%-28s %s\n' "$cmd" "${DEPENDENCIES[$cmd]:-NOT INSTALLED}"; done
+    render_section 'BUNDLED TOOLCHAIN (section 36)'
+    printf '%-10s %-10s %-13s %s\n' COMPONENT ORIGIN STATE VERSION
+    while IFS=$'\t' read -r cmd origin state version _; do
+        printf '%-10s %-10s %-13s %s\n' "$cmd" "$origin" "$state" "$version"
+    done < <(sntl_component_rows)
+    printf 'BUNDLED = shipped validated copy in use; SYSTEM = host tool; CORRUPT/INCOMPATIBLE are refused.\n'
     render_section 'LAZY CAPABILITY PROBES'
     if [[ $SCOPE_READY == 1 ]]; then
         collect_text discovery 300 kctl_cluster api-resources --verbs=list -o name >/dev/null || :
@@ -4347,7 +4644,7 @@ explain_report() {
     case ${topic,,} in
         overview)
             cat <<'TXT'
-PURPOSE       Unified read-only Kubernetes, GitOps, PKI/TLS and ETDP troubleshooting console.
+PURPOSE       Unified read-only Kubernetes, GitOps, PKI/TLS and application-profile troubleshooting console.
 DATA SOURCE   Kubernetes APIs, metrics API, Flux/cert-manager APIs, Helm metadata, local host networking, explicit TLS/DB/Kafka targets.
 COMMANDS      All external operations pass through bounded wrappers; mutation commands are not exposed.
 RBAC          Namespace list/get plus optional cluster read permissions for nodes/PV/storage classes/CRDs.
@@ -4442,6 +4739,56 @@ selftest_cert_category() { certificate_validity '2000-01-01T00:00:00Z' '2001-01-
 selftest_export() { local f; f=$(mktemp "$RUN_DIR/selftest-report.XXXXXXXX"); printf 'alpha\tbeta\n' > "$f"; export_file "$f" selftest txt >/dev/null; ls "$SNTL_EXPORT_DIR"/selftest-*.txt >/dev/null 2>&1; }
 selftest_function_contracts() { local f; for f in resource_dependencies resource_consumers cert_expiry_audit certificate_dependency_report gitops_dependency_report pg_discover_report kafka_discovery_report host_network_report evidence_create; do declare -F "$f" >/dev/null || return 1; done; }
 
+# Bundled-toolchain fixtures (sections 77-81). Uses a synthetic bundle so the
+# suite is deterministic, offline and independent of the host tool set.
+bundle_self_tests() (
+    local root saved_path=$PATH saved_home=${SNTL_HOME-} saved_bin=${SNTL_BIN_DIR-}
+    local failed=0 digest platform
+    root=$(mktemp -d "$RUN_DIR/bundle-fixture.XXXXXXXX") || return 1
+    trap 'rm -rf -- "$root"' EXIT
+    mkdir -p -- "$root/bin"
+
+    # DS-BUNDLE-004: a valid bundled component with a matching manifest digest.
+    printf '#!/bin/sh\necho jq-fixture\n' > "$root/bin/jq"
+    chmod 755 "$root/bin/jq"
+    digest=$(sntl_sha256_file "$root/bin/jq") || return 1
+    printf 'jq\t1.7.1\t%s\tMIT\thttps://stedolan.github.io/jq/\n' "$digest" > "$root/bin/components.tsv"
+
+    SNTL_HOME=$root SNTL_BIN_DIR=$root/bin
+    PATH=/usr/bin:/bin
+    sntl_toolchain_init >/dev/null 2>&1
+
+    # DS-BUNDLE-004 / DS-BUNDLE-012: bundled copy wins and joins the process PATH.
+    [[ ${SNTL_TOOL_ORIGIN[jq]:-} == BUNDLED && ${SNTL_TOOL_STATE[jq]:-} == OK ]] || {
+        printf 'bundled jq was not preferred (origin=%s state=%s)\n' "${SNTL_TOOL_ORIGIN[jq]:-}" "${SNTL_TOOL_STATE[jq]:-}"; failed=1; }
+    [[ $PATH == "$root/bin:"* ]] || { printf 'bundled bin dir not prepended to PATH\n'; failed=1; }
+
+    # DS-BUNDLE-014 / DS-BUNDLE-078: one flipped byte must be refused, never run.
+    printf '#!/bin/sh\necho tampered\n' > "$root/bin/jq"
+    chmod 755 "$root/bin/jq"
+    sntl_toolchain_init >/dev/null 2>&1
+    [[ ${SNTL_TOOL_STATE[jq]:-} == CORRUPT ]] || { printf 'corrupted component not detected\n'; failed=1; }
+    [[ ${SNTL_TOOL_ORIGIN[jq]:-} != BUNDLED ]] || { printf 'corrupted component was still selected\n'; failed=1; }
+
+    # DS-BUNDLE-013: verify/offline reports run without a cluster and fail on CORRUPT.
+    verify_bundle_report >/dev/null 2>&1 && { printf 'verify passed a corrupt bundle\n'; failed=1; }
+    offline_check_report >/dev/null 2>&1 && { printf 'offline check passed a corrupt bundle\n'; failed=1; }
+
+    # DS-BUNDLE-015: platform detection yields a supported tuple.
+    platform=$(sntl_platform)
+    [[ $platform == linux-* ]] || { printf 'unexpected platform %s\n' "$platform"; failed=1; }
+
+    # DS-BUNDLE-016: an unchanged payload is reused rather than re-extracted.
+    sntl_toolchain_init >/dev/null 2>&1
+    [[ ${SNTL_TOOL_STATE[jq]:-} == CORRUPT ]] || { printf 'runtime reuse lost the recorded state\n'; failed=1; }
+
+    # DS-BUNDLE-018: the read-only guard is independent of tool origin.
+    scope_args_safe --token=fixture >/dev/null 2>&1 && { printf 'guard allowed --token through\n'; failed=1; }
+
+    PATH=$saved_path SNTL_HOME=${saved_home:-} SNTL_BIN_DIR=${saved_bin:-}
+    ((failed==0))
+)
+
 sentinel_self_test() {
     SELFTEST_TOTAL=0 SELFTEST_PASS=0 SELFTEST_FAIL=0
     printf 'DEVOPSSENTINEL SELF-TEST | %s\n' "$(timestamp)"
@@ -4466,6 +4813,7 @@ sentinel_self_test() {
     _selftest_case 'triage integration fixtures' triage_integration_tests
     _selftest_case 'GitOps and certificate fixtures' gitops_certificate_self_tests
     _selftest_case 'Splunk response fixtures (offline)' splunk_self_tests
+    _selftest_case 'Bundled toolchain fixtures (offline)' bundle_self_tests
     printf '\nTOTAL=%s PASS=%s FAIL=%s\n' "$SELFTEST_TOTAL" "$SELFTEST_PASS" "$SELFTEST_FAIL"
     ((SELFTEST_FAIL==0))
 }
@@ -4930,7 +5278,7 @@ TOPOLOGY / PLATFORM
  22  PostgreSQL / Generic DB
  23  Kafka Diagnostics
  24  Namespace / Context
- 25  ETDP Platform Inspector
+ 25  Application Profile Inspector
 
 GITOPS / CONFIGURATION
  11  GitOps Command Center
@@ -5700,7 +6048,7 @@ dashboard_report() {
         ui_menu_pair 7 'Service & Network Topology' 18 'Trust Chain Analyzer'
         ui_menu_pair 19 'Live TLS Inspector' 20 'Certificate Dependencies'
         ui_menu_pair 22 'PostgreSQL / Generic DB' 23 'Kafka Diagnostics'
-        ui_menu_pair 25 'ETDP Platform Inspector' 27 'Evidence Collector'
+        ui_menu_pair 25 'Application Profile' 27 'Evidence Collector'
         ui_menu_pair 24 'Namespace / Context' 28 'Export Center'
         ui_menu_pair 30 'Self-Test' 36 'UI Debug / Explain'
     fi
@@ -5744,7 +6092,7 @@ ui_command_palette() {
         '35|change detection diff changed resources' '1|pods resource grid' '2|live pod search filter' '3|failed alert pods' '4|events event radar'
         '9|smart health' '10|dependency explorer' '11|gitops command center' '12|gitops drift revision' '13|gitops dependencies'
         '16|certificate inventory' '17|certificate expiry' '18|trust chain' '19|live tls' '20|certificate dependencies'
-        '21|network host' '8|storage' '6|performance' '22|postgres database' '23|kafka' '25|etdp' '29|doctor' '27|evidence' '28|export'
+        '21|network host' '8|storage' '6|performance' '22|postgres database' '23|kafka' '25|application profile' '29|doctor' '27|evidence' '28|export'
         '36|ui debug explain' '37|operator note' '38|favorite namespace' '39|live triage refresh watch' '40|dependency path finder relationship path'
     ) matches=()
     prompt 'COMMAND >' || return 1; query=${REPLY,,}; [[ -n $query ]] || return 1
@@ -5800,7 +6148,7 @@ dashboard() {
             21|n) show_report 'NETWORK — HOST INSPECTOR' host_network_report;;
             22) postgres_menu;; 23) kafka_menu;;
             24|ns) change_scope || { rc=$?; break; }; advanced_runtime_init;;
-            25) etdp_menu;;
+            25) application_profile_menu;;
             26|t) show_report 'INCIDENT — TRIAGE' triage_report;;
             27) evidence_menu;; 28|o) export_center;; 29) show_report 'PLATFORM — ENVIRONMENT DOCTOR' devopssentinel_doctor_report;; 30) show_report 'PLATFORM — SELF TEST' sentinel_self_test;;
             31|f) ui_findings_menu;;
@@ -5868,14 +6216,14 @@ advanced_ui_self_tests() (
 
 usage() {
     cat <<'HELP'
-DevOpsSentinel FINAL -- single-file read-only Kubernetes/GitOps/PKI/TLS/ETDP console
+DevOpsSentinel FINAL -- single-file read-only Kubernetes/GitOps/PKI/TLS/application-profile console
 
 Interactive:
   ./DevOps_K8s_Sentinel_FINAL.sh
 
 Reports:
   --health | --resources | --gitops | --gitops-graph | --certificates | --cert-expiry
-  --triage | --triage-workload NAME | --network | --storage | --etdp
+  --triage | --triage-workload NAME | --network | --storage | --application-profile
   --postgres-discovery | --kafka-discovery | --doctor | --capabilities
   --dependency TYPE/NAME | --explain [TOPIC]
 Validation:
@@ -5895,6 +6243,12 @@ UI:
   --incident ID   Local incident session; exports/evidence stay under ~/.devopssentinel/evidence/ID
   --persona MODE  STANDARD|SRE|PKI|GITOPS menu emphasis only
   DEVOPSSENTINEL_UNICODE=auto|on|off controls tree glyphs
+Bundle:
+  --components    Bundled component inventory + feature dependency matrix
+  --licenses      Bundled component license inventory
+  --offline-check Validate offline readiness (payload, binaries, checksums, platform)
+  --verify        Verify main executable + extracted component digests
+  --checksum      Print executable / manifest / component SHA256 digests
 Output:
   --json --quiet --no-color --version --help
 
@@ -5919,7 +6273,9 @@ parse_cli() {
             --incident) cli_need_value "$@" || return; INCIDENT_ID=$2; shift;;
             --persona) cli_need_value "$@" || return; UI_PERSONA=${2^^}; case $UI_PERSONA in STANDARD|SRE|PKI|GITOPS) :;; *) printf "Invalid persona: %s\n" "$2" >&2; return 2;; esac; shift;;
             --snapshot) ((mode_set==0)) || { printf 'Select exactly one command mode\n' >&2; return 2; }; MODE=snapshot; mode_set=1;;
-            --health|--resources|--gitops|--gitops-graph|--certificates|--cert-expiry|--triage|--network|--storage|--etdp|--postgres-discovery|--kafka-discovery|--doctor|--capabilities|--self-test|--live-validate|--performance)
+            --components|--licenses|--offline-check|--verify|--checksum)
+                ((mode_set==0)) || { printf 'Select exactly one command mode\n' >&2; return 2; }; MODE=${opt#--}; mode_set=1;;
+            --health|--resources|--gitops|--gitops-graph|--certificates|--cert-expiry|--triage|--network|--storage|--application-profile|--postgres-discovery|--kafka-discovery|--doctor|--capabilities|--self-test|--live-validate|--performance)
                 ((mode_set==0)) || { printf 'Select exactly one command mode\n' >&2; return 2; }; MODE=${opt#--}; mode_set=1;;
             --triage-workload) cli_need_value "$@" || return; ((mode_set==0)) || return 2; MODE=triage-workload TRIAGE_WORKLOAD=$2 mode_set=1; shift;;
             --evidence) cli_need_value "$@" || return; ((mode_set==0)) || return 2; MODE=evidence EVIDENCE_ID=$2 mode_set=1; shift;;
@@ -5949,6 +6305,9 @@ main() {
     if ((BASH_VERSINFO[0]<4 || (BASH_VERSINFO[0]==4 && BASH_VERSINFO[1]<4))); then printf 'Bash 4.4+ required\n' >&2; return 2; fi
     local rc=0 title fn
     parse_cli "$@"; rc=$?; ((rc==10)) && return 0; ((rc==0)) || return "$rc"
+    # Resolve the bundled toolchain before dependency_detect so a host with none
+    # of these packages installed still reports them AVAILABLE (sections 16, 35, 67).
+    sntl_toolchain_init || :
     dependency_detect; color_init; terminal_size
     SOURCE_FILE=$(cd -- "$(dirname -- "$SOURCE_FILE")" && printf '%s/%s' "$(pwd -P)" "${SOURCE_FILE##*/}") || return 2
     init_runtime || return
@@ -5958,6 +6317,11 @@ main() {
         self-test) sentinel_self_test; return $?;;
         explain) explain_report "$EXPLAIN_TOPIC"; return 0;;
         ui-debug) ui_debug_report; return 0;;
+        components) components_report; return $?;;
+        licenses) licenses_report; return $?;;
+        offline-check) offline_check_report; return $?;;
+        verify) verify_bundle_report; return $?;;
+        checksum) checksum_report; return $?;;
     esac
 
     if [[ $MODE == dashboard && $INTERACTIVE == 0 ]]; then printf 'Dashboard needs a terminal; use a report option for noninteractive output.\n' >&2; return 2; fi
@@ -5975,7 +6339,7 @@ main() {
         triage-workload) capture_report 'Workload Triage' triage_workload_report "$TRIAGE_WORKLOAD"; rc=$?; cli_report_output 'Workload Triage' "$rc" || return $?; return "$rc";;
         network) title='Network'; fn=service_topology_report;;
         storage) title='Storage'; fn=storage_dependency_report;;
-        etdp) title='ETDP Platform'; fn=etdp_platform_report;;
+        application-profile) title='Application Profile'; fn=application_profile_report;;
         postgres-discovery) title='PostgreSQL / Generic DB'; fn=pg_discover_report;;
         kafka-discovery) title='Kafka'; fn=kafka_discovery_report;;
         doctor) title='Doctor'; fn=devopssentinel_doctor_report;;

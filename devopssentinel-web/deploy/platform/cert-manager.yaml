@@ -1,0 +1,36 @@
+# DevOpsSentinel Web -- optional cert-manager fixtures (PKI / TLS page).
+#
+# Applied by scripts/platform-resources.sh ONLY when the cert-manager CRDs are
+# present, so the base fixture set still works on a cluster without cert-manager.
+# Everything carries `devopssentinel.io/platform: "true"` for one-command cleanup.
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: platform-selfsigned
+  labels:
+    devopssentinel.io/platform: "true"
+spec:
+  selfSigned: {}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: platform-cert
+  labels:
+    devopssentinel.io/platform: "true"
+spec:
+  secretName: platform-cert-tls
+  secretTemplate:
+    labels:
+      devopssentinel.io/platform: "true"
+  commonName: platform-cert.internal
+  dnsNames:
+    - platform-cert.internal
+    - platform-cert.default.svc
+  duration: 2160h      # 90 days
+  renewBefore: 360h    # 15 days
+  issuerRef:
+    name: platform-selfsigned
+    kind: ClusterIssuer
+    group: cert-manager.io

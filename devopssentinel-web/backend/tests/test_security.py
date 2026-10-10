@@ -77,6 +77,32 @@ def test_redact_still_treats_plain_text_line_wise():
     assert "eyJhbGciOiJIUzI1NiJ9" not in out
 
 
+def test_redact_keeps_tab_table_rows_intact():
+    """A sensitive CELL must not collapse a TAB-separated engine table row.
+
+    Regression: whole-row redaction replaced ``name<TAB>Opaque<TAB>…<TAB>password``
+    with a single ``[REDACTED]`` token. ``extract_tables`` treats a one-cell line as
+    the end of the table, so every later Secret row silently disappeared from
+    ``/api/v1/secrets`` (only the first Secret was ever listed).
+    """
+    row = "platform-postgres\tOpaque\t2026-10-04T10:44:21Z\t1\tpassword"
+    cells = redact_text(row).split("\t")
+    assert len(cells) == 5
+    assert cells[:4] == ["platform-postgres", "Opaque", "2026-10-04T10:44:21Z", "1"]
+    assert cells[4] == "[REDACTED]"
+
+    # A row with no sensitive cell is passed through untouched.
+    following = "platform-tls\tkubernetes.io/tls\t2026-10-04T10:44:21Z\t2\ttls.crt tls.key"
+    assert redact_text(following) == following
+
+    # The same guarantee holds on the JSON (``--json``) path.
+    payload = json.dumps({"lines": [row, following]})
+    lines = json.loads(redact_text(payload))["lines"]
+    assert len(lines) == 2
+    assert lines[1] == following
+    assert lines[0].split("\t")[0] == "platform-postgres"
+
+
 def test_read_only_guard_blocks_mutation_verbs():
     with pytest.raises(PermissionError):
         assert_read_only(["get", "pods", "delete", "pod/x"])
